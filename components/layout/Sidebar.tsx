@@ -2,112 +2,21 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
-import { Database, RefreshCw, Clock, ChevronRight, ChevronDown } from 'lucide-react'
+import { Database, RefreshCw, Clock } from 'lucide-react'
 import { clsx } from 'clsx'
 
 interface SidebarProps {
   stagedCount?: number
-  materialCounts?: {
-    wood: {
-      total: number
-      mdf: number
-      plywood: number
-      osb: number
-    }
-    plastic: {
-      total: number
-      acrylic: number
-      polycarbonate: number
-      dibond: number
-    }
-    accessories: number
-  }
-  activeFilters?: {
-    category?: string
-    typeFinish?: string
-  }
-  onFilterChange?: (filters: { category?: string; typeFinish?: string }) => void
 }
 
 const NAV_ITEMS = [
-  { href: '/database', label: 'Database', icon: Database },
-  { href: '/price-updates', label: 'Price Updates', icon: RefreshCw },
-  { href: '/staged-changes', label: 'Staged Changes', icon: Clock, badge: true },
+  { href: '/database',       label: 'Database',        icon: Database },
+  { href: '/price-updates',  label: 'Price Updates',   icon: RefreshCw },
+  { href: '/staged-changes', label: 'Staged Changes',  icon: Clock, badge: true },
 ]
 
-interface FilterGroup {
-  label: string
-  category: string
-  children: Array<{ label: string; typeFinish: string; countKey: string }>
-}
-
-const FILTER_GROUPS: FilterGroup[] = [
-  {
-    label: 'Wood',
-    category: 'Wood',
-    children: [
-      { label: 'MDF', typeFinish: 'MDF', countKey: 'mdf' },
-      { label: 'Plywood', typeFinish: 'Plywood', countKey: 'plywood' },
-      { label: 'OSB', typeFinish: 'OSB', countKey: 'osb' },
-    ],
-  },
-  {
-    label: 'Plastic',
-    category: 'Plastic',
-    children: [
-      { label: 'Acrylic', typeFinish: 'Acrylic', countKey: 'acrylic' },
-      { label: 'Polycarbonate', typeFinish: 'Polycarbonate', countKey: 'polycarbonate' },
-      { label: 'Dibond', typeFinish: 'Dibond', countKey: 'dibond' },
-    ],
-  },
-]
-
-export function Sidebar({
-  stagedCount = 0,
-  materialCounts,
-  activeFilters,
-  onFilterChange,
-}: SidebarProps) {
+export function Sidebar({ stagedCount = 0 }: SidebarProps) {
   const pathname = usePathname()
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    Wood: true,
-    Plastic: true,
-  })
-
-  function toggleGroup(category: string) {
-    setExpandedGroups((prev) => ({ ...prev, [category]: !prev[category] }))
-  }
-
-  function handleCategoryClick(category: string) {
-    if (activeFilters?.category === category && !activeFilters.typeFinish) {
-      onFilterChange?.({})
-    } else {
-      onFilterChange?.({ category })
-    }
-  }
-
-  function handleTypeFinishClick(category: string, typeFinish: string) {
-    if (activeFilters?.category === category && activeFilters.typeFinish === typeFinish) {
-      onFilterChange?.({})
-    } else {
-      onFilterChange?.({ category, typeFinish })
-    }
-  }
-
-  function getCategoryCount(category: string) {
-    if (!materialCounts) return null
-    if (category === 'Wood') return materialCounts.wood.total
-    if (category === 'Plastic') return materialCounts.plastic.total
-    return null
-  }
-
-  function getTypeFinishCount(category: string, key: string) {
-    if (!materialCounts) return null
-    if (category === 'Wood') return materialCounts.wood[key as keyof typeof materialCounts.wood]
-    if (category === 'Plastic') return materialCounts.plastic[key as keyof typeof materialCounts.plastic]
-    return null
-  }
 
   return (
     <aside
@@ -135,7 +44,7 @@ export function Sidebar({
       </div>
 
       {/* Nav */}
-      <nav className="px-2 pt-3 pb-2">
+      <nav className="px-2 pt-3 pb-2 flex-1">
         {NAV_ITEMS.map(({ href, label, icon: Icon, badge }) => {
           const isActive = pathname.startsWith(href)
           return (
@@ -164,115 +73,9 @@ export function Sidebar({
         })}
       </nav>
 
-      {/* Divider */}
-      <div className="mx-4 border-t border-white/8 my-1" />
-
-      {/* Filters */}
-      <div className="flex-1 overflow-y-auto px-2 py-2">
-        <p className="px-3 mb-2 text-[11px] uppercase tracking-widest font-medium" style={{ color: '#5C5F66' }}>
-          Filter
-        </p>
-
-        {FILTER_GROUPS.map((group) => {
-          const isExpanded = expandedGroups[group.category]
-          const categoryActive =
-            activeFilters?.category === group.category && !activeFilters.typeFinish
-          const count = getCategoryCount(group.category)
-
-          return (
-            <div key={group.category} className="mb-0.5">
-              {/* Group header */}
-              <button
-                type="button"
-                className="w-full flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-left group transition-colors duration-150 hover:bg-white/5"
-                onClick={() => toggleGroup(group.category)}
-              >
-                {isExpanded ? (
-                  <ChevronDown size={12} className="shrink-0 text-[#5C5F66] group-hover:text-[#C8CAD0]" />
-                ) : (
-                  <ChevronRight size={12} className="shrink-0 text-[#5C5F66] group-hover:text-[#C8CAD0]" />
-                )}
-                <button
-                  type="button"
-                  className={clsx(
-                    'flex-1 text-left sidebar-filter-label transition-colors duration-150',
-                    categoryActive ? 'text-white font-medium' : 'hover:text-white'
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleCategoryClick(group.category)
-                  }}
-                >
-                  {group.label}
-                </button>
-                {count !== null && (
-                  <span className="text-[11px]" style={{ color: '#5C5F66' }}>
-                    {count}
-                  </span>
-                )}
-              </button>
-
-              {/* Children */}
-              {isExpanded && (
-                <div className="ml-5 mt-0.5 space-y-0.5">
-                  {group.children.map((child) => {
-                    const childActive =
-                      activeFilters?.category === group.category &&
-                      activeFilters.typeFinish === child.typeFinish
-                    const childCount = getTypeFinishCount(group.category, child.countKey)
-
-                    return (
-                      <button
-                        key={child.typeFinish}
-                        type="button"
-                        onClick={() => handleTypeFinishClick(group.category, child.typeFinish)}
-                        className={clsx(
-                          'w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-left transition-colors duration-150',
-                          childActive
-                            ? 'bg-white/8 text-white'
-                            : 'sidebar-filter-label hover:bg-white/5 hover:text-white'
-                        )}
-                      >
-                        <span>{child.label}</span>
-                        {childCount !== null && (
-                          <span className="text-[11px]" style={{ color: '#5C5F66' }}>
-                            {childCount}
-                          </span>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )
-        })}
-
-        {/* Accessories */}
-        <button
-          type="button"
-          onClick={() => handleCategoryClick('Accessories')}
-          className={clsx(
-            'w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-left transition-colors duration-150',
-            activeFilters?.category === 'Accessories'
-              ? 'bg-white/8 text-white sidebar-filter-label'
-              : 'sidebar-filter-label hover:bg-white/5 hover:text-white'
-          )}
-        >
-          <span>Accessories</span>
-          {materialCounts && (
-            <span className="text-[11px]" style={{ color: '#5C5F66' }}>
-              {materialCounts.accessories}
-            </span>
-          )}
-        </button>
-      </div>
-
       {/* Footer */}
       <div className="px-4 py-3 border-t border-white/5">
-        <p className="text-[11px]" style={{ color: '#3D4048' }}>
-          v0.1.0
-        </p>
+        <p className="text-[11px]" style={{ color: '#3D4048' }}>v0.1.0</p>
       </div>
     </aside>
   )
