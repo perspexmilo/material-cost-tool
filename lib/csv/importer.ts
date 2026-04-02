@@ -65,6 +65,8 @@ const MATERIAL_CATEGORY_MAP: Record<string, string> = {
   phenolic: 'Wood',
   hardboard: 'Wood',
   chipboard: 'Wood',
+  mfc: 'Wood',   // Melamine-Faced Chipboard
+  timber: 'Wood',
   acrylic: 'Plastic',
   polycarbonate: 'Plastic',
   acm: 'Plastic',
@@ -112,7 +114,7 @@ async function importMetabaseRow(
     return
   }
 
-  const entityIdRaw = row['entity_id']?.trim() ?? ''
+  const entityIdRaw = row['entity_id']?.trim().replace(/,/g, '') ?? ''
   const magentoEntityId = entityIdRaw ? parseInt(entityIdRaw, 10) : null
 
   // Prefer "Variant Name" over legacy "Name" column

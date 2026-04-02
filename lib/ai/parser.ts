@@ -1,11 +1,14 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getMaterials } from '@/lib/db/materials'
 import { resolveAliases } from '@/lib/db/supplier-aliases'
+import { getParserContextHints } from '@/lib/db/parser-context'
 import type { ParseResult, ResolvedChange, UnresolvedItem, ParsedRange, ConfidenceLevel } from '@/types'
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-})
+function getClient() {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set in environment variables')
+  return new Anthropic({ apiKey })
+}
 
 const SYSTEM_PROMPT = `You are a specialist data extraction assistant for CutMy, a sheet material cutting company. Your job is to parse supplier price update emails and extract structured information about price changes.
 
@@ -129,18 +132,29 @@ function fuzzyScore(rangeName: string, materialDescription: string): number {
 
   if (desc.includes(range) || range.includes(desc)) return 0.9
 
-  const rangeWords = range.split(/\s+/)
-  const descWords = desc.split(/\s+/)
+  // Filter out short words (≤ 2 chars) to prevent single letters like "a" in
+  // "Type A Beading" from matching as a substring of "clear" or "acrylic".
+  const rangeWords = range.split(/\s+/).filter((w) => w.length > 2)
+  const descWords = desc.split(/\s+/).filter((w) => w.length > 2)
+  if (rangeWords.length === 0) return 0
+
   const matches = rangeWords.filter((w) => descWords.some((d) => d.includes(w) || w.includes(d)))
   return matches.length / Math.max(rangeWords.length, descWords.length)
 }
 
 export async function parseEmail(emailBody: string): Promise<ParseResult> {
-  // 1. Call Claude to extract structured data
-  const response = await client.messages.create({
+  // 1. Load any user-defined context hints and append to the system prompt
+  const contextHints = await getParserContextHints()
+  const systemPrompt =
+    contextHints.length > 0
+      ? `${SYSTEM_PROMPT}\n\nADDITIONAL CONTEXT FROM CutMy TEAM:\n${contextHints.map((h, i) => `${i + 1}. ${h}`).join('\n')}`
+      : SYSTEM_PROMPT
+
+  // 2. Call Claude to extract structured data
+  const response = await getClient().messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 4096,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     tools: [extractionTool],
     tool_choice: { type: 'any' },
     messages: [
@@ -151,7 +165,7 @@ export async function parseEmail(emailBody: string): Promise<ParseResult> {
     ],
   })
 
-  // 2. Parse the tool use response
+  // 3. Parse the tool use response
   const toolUseBlock = response.content.find((block) => block.type === 'tool_use')
   if (!toolUseBlock || toolUseBlock.type !== 'tool_use') {
     return {
@@ -164,7 +178,7 @@ export async function parseEmail(emailBody: string): Promise<ParseResult> {
 
   const extracted = toolUseBlock.input as ExtractionResult
 
-  // 3. Load all materials and known aliases
+  // 4. Load all materials and known aliases
   const [allMaterials, aliasMap] = await Promise.all([
     getMaterials(),
     resolveAliases(extracted.ranges.map((r) => r.name)),
@@ -173,7 +187,7 @@ export async function parseEmail(emailBody: string): Promise<ParseResult> {
   const resolved: ResolvedChange[] = []
   const unresolved: UnresolvedItem[] = []
 
-  // 4. Try to match each extracted range to a material
+  // 5. Try to match each extracted range to a material
   for (const range of extracted.ranges) {
     const knownMaterialId = aliasMap[range.name]
 
@@ -198,28 +212,32 @@ export async function parseEmail(emailBody: string): Promise<ParseResult> {
       }
     }
 
-    // 5. Fuzzy match against all materials
+    // 5. Fuzzy match against all materials — return ALL good matches so that
+    //    a range-level description (e.g. "Clear Acrylic") resolves every thickness.
     const scored = allMaterials
       .map((m) => ({ material: m, score: fuzzyScore(range.name, m.description) }))
       .filter((s) => s.score > 0.3)
       .sort((a, b) => b.score - a.score)
 
     if (scored.length > 0 && scored[0].score > 0.6) {
-      const best = scored[0].material
-      const confidence: ConfidenceLevel = scored[0].score > 0.8 ? 'high' : 'medium'
-      const proposedCost = calculateProposedCost(best.costPerSheet, range.changeType, range.changeValue)
-      resolved.push({
-        materialId: best.id,
-        materialDescription: best.description,
-        currentCost: best.costPerSheet,
-        proposedCost,
-        changePercent: calculateChangePercent(best.costPerSheet, proposedCost),
-        effectiveDate: range.effectiveDate,
-        confidence,
-        rawText: range.rawText,
-        aliasRawText: range.name,
-        supplier: best.supplier?.name,
-      })
+      // Include every material whose score is ≥ 0.6 (not just the top one)
+      const matches = scored.filter((s) => s.score >= 0.6)
+      for (const match of matches) {
+        const confidence: ConfidenceLevel = match.score > 0.8 ? 'high' : 'medium'
+        const proposedCost = calculateProposedCost(match.material.costPerSheet, range.changeType, range.changeValue)
+        resolved.push({
+          materialId: match.material.id,
+          materialDescription: match.material.description,
+          currentCost: match.material.costPerSheet,
+          proposedCost,
+          changePercent: calculateChangePercent(match.material.costPerSheet, proposedCost),
+          effectiveDate: range.effectiveDate,
+          confidence,
+          rawText: range.rawText,
+          aliasRawText: range.name,
+          supplier: match.material.supplier?.name,
+        })
+      }
     } else {
       // Cannot resolve
       const parsedRange: ParsedRange = {
@@ -242,8 +260,21 @@ export async function parseEmail(emailBody: string): Promise<ParseResult> {
     }
   }
 
+  // Deduplicate resolved items: if the same materialId was matched by multiple
+  // extracted ranges, keep the one with the highest-confidence entry.
+  const confidenceRank: Record<ConfidenceLevel, number> = { high: 2, medium: 1, low: 0 }
+  const dedupedResolved = Object.values(
+    resolved.reduce<Record<string, ResolvedChange>>((acc, item) => {
+      const existing = acc[item.materialId]
+      if (!existing || confidenceRank[item.confidence] > confidenceRank[existing.confidence]) {
+        acc[item.materialId] = item
+      }
+      return acc
+    }, {}),
+  )
+
   return {
-    resolved,
+    resolved: dedupedResolved,
     unresolved,
     manufacturers: extracted.manufacturers,
     parseTimestamp: new Date().toISOString(),

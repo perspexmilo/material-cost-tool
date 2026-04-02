@@ -5,9 +5,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { RefreshCw, AlertCircle, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ReviewTable } from './ReviewTable'
+import { ContextPanel } from './ContextPanel'
 import type { ParseResult, BulkUpdateResponse } from '@/types'
 
+type LeftTab = 'email' | 'context'
+
 export function PriceUpdateTool() {
+  const [activeTab, setActiveTab] = useState<LeftTab>('email')
   const [emailBody, setEmailBody] = useState('')
   const [parseResult, setParseResult] = useState<ParseResult | null>(null)
   const [commitResult, setCommitResult] = useState<BulkUpdateResponse | null>(null)
@@ -52,50 +56,76 @@ export function PriceUpdateTool() {
     <div className="flex gap-6 min-h-[calc(100vh-48px-64px)]">
       {/* Left panel — 38% */}
       <div className="w-[38%] shrink-0 flex flex-col gap-4">
-        <div className="bg-white rounded-xl border border-[#E5E5E3] p-4 flex flex-col gap-3">
-          <div>
-            <label className="block text-[12px] font-semibold uppercase tracking-wider text-gray-500 mb-2">
-              Paste Supplier Email
-            </label>
-            <textarea
-              value={emailBody}
-              onChange={(e) => setEmailBody(e.target.value)}
-              placeholder="Paste the full supplier price update email here…"
-              className="w-full h-64 px-3 py-2 text-[13px] text-gray-900 placeholder:text-gray-400 border border-[#E5E5E3] rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA] leading-relaxed"
-            />
+        <div className="bg-white rounded-xl border border-[#E5E5E3] overflow-hidden">
+          {/* Tab bar */}
+          <div className="flex border-b border-[#E5E5E3]">
+            {(['email', 'context'] as LeftTab[]).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2.5 text-[12px] font-semibold capitalize tracking-wide transition-colors ${
+                  activeTab === tab
+                    ? 'text-[#2DBDAA] border-b-2 border-[#2DBDAA] -mb-px'
+                    : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                {tab === 'email' ? 'Email' : 'Context'}
+              </button>
+            ))}
           </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-[12px] text-gray-400">
-              {emailBody.trim().length > 0
-                ? `${emailBody.trim().split(/\s+/).length} words`
-                : 'No content'}
-            </span>
-            <div className="flex items-center gap-2">
-              {hasContent && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmailBody('')
-                    setParseResult(null)
-                    setCommitResult(null)
-                  }}
-                  className="text-[12px] text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  Clear
-                </button>
-              )}
-              <Button
-                variant="primary"
-                size="md"
-                disabled={!hasContent || parseMutation.isPending}
-                loading={parseMutation.isPending}
-                onClick={handleParse}
-              >
-                <RefreshCw size={14} />
-                Parse Email
-              </Button>
-            </div>
+          <div className="p-4">
+            {activeTab === 'email' ? (
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="block text-[12px] font-semibold uppercase tracking-wider text-gray-500 mb-2">
+                    Paste Supplier Email
+                  </label>
+                  <textarea
+                    value={emailBody}
+                    onChange={(e) => setEmailBody(e.target.value)}
+                    placeholder="Paste the full supplier price update email here…"
+                    className="w-full h-64 px-3 py-2 text-[13px] text-gray-900 placeholder:text-gray-400 border border-[#E5E5E3] rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA] leading-relaxed"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] text-gray-400">
+                    {emailBody.trim().length > 0
+                      ? `${emailBody.trim().split(/\s+/).length} words`
+                      : 'No content'}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {hasContent && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmailBody('')
+                          setParseResult(null)
+                          setCommitResult(null)
+                        }}
+                        className="text-[12px] text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <Button
+                      variant="primary"
+                      size="md"
+                      disabled={!hasContent || parseMutation.isPending}
+                      loading={parseMutation.isPending}
+                      onClick={handleParse}
+                    >
+                      <RefreshCw size={14} />
+                      Parse Email
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <ContextPanel />
+            )}
           </div>
         </div>
 

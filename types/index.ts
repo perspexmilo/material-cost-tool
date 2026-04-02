@@ -62,6 +62,12 @@ export interface SupplierAlias {
   createdAt: string
 }
 
+export interface ParserContextHint {
+  id: string
+  hint: string
+  createdAt: string
+}
+
 // ─── Update Source ────────────────────────────────────────────────────────────
 
 export type UpdateSource = 'manual' | 'email-parse' | 'import' | 'staged'

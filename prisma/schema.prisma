@@ -100,3 +100,11 @@ model SupplierAlias {
   @@index([rawText])
   @@map("supplier_aliases")
 }
+
+model ParserContext {
+  id        String   @id @default(cuid())
+  hint      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("parser_context")
+}
