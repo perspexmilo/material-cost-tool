@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow, format } from 'date-fns'
-import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, Trash2, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { CostHistoryPanel } from './CostHistoryPanel'
 import { ImportDialog } from './ImportDialog'
@@ -14,23 +14,18 @@ interface MaterialsTableProps {
   filters?: MaterialFilters
 }
 
+type SortColumn = 'variantType' | 'description' | 'thicknessMm' | 'costPerSheet' | 'supplier' | 'lastUpdatedAt'
+type SortDir = 'asc' | 'desc'
+
+// ─── Formatters ───────────────────────────────────────────────────────────────
+
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: 'GBP',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
+  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
 }
 
 function formatM2Cost(value: number | undefined): string {
   if (value === undefined) return '—'
-  return new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: 'GBP',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
+  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
 }
 
 function sourceLabel(source: string): string {
@@ -41,6 +36,35 @@ function sourceLabel(source: string): string {
     case 'staged':      return 'Scheduled'
     default:            return source
   }
+}
+
+// ─── Sort + group ─────────────────────────────────────────────────────────────
+
+function sortMaterials(materials: Material[], col: SortColumn, dir: SortDir): Material[] {
+  return [...materials].sort((a, b) => {
+    let cmp = 0
+    switch (col) {
+      case 'variantType':
+        cmp = (a.variantType ?? '').localeCompare(b.variantType ?? '')
+        break
+      case 'description':
+        cmp = a.description.localeCompare(b.description)
+        break
+      case 'thicknessMm':
+        cmp = a.thicknessMm - b.thicknessMm
+        break
+      case 'costPerSheet':
+        cmp = a.costPerSheet - b.costPerSheet
+        break
+      case 'supplier':
+        cmp = (a.supplier?.name ?? '').localeCompare(b.supplier?.name ?? '')
+        break
+      case 'lastUpdatedAt':
+        cmp = new Date(a.lastUpdatedAt).getTime() - new Date(b.lastUpdatedAt).getTime()
+        break
+    }
+    return dir === 'asc' ? cmp : -cmp
+  })
 }
 
 function groupMaterials(materials: Material[]): MaterialGroup[] {
@@ -55,81 +79,113 @@ function groupMaterials(materials: Material[]): MaterialGroup[] {
   return Array.from(groupMap.values())
 }
 
-// Indeterminate checkbox — native checkbox doesn't support indeterminate via prop
-function IndeterminateCheckbox({
-  checked,
-  indeterminate,
-  onChange,
-  className,
-}: {
-  checked: boolean
-  indeterminate: boolean
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-  className?: string
+// ─── Indeterminate checkbox ───────────────────────────────────────────────────
+
+function IndeterminateCheckbox({ checked, indeterminate, onChange, className }: {
+  checked: boolean; indeterminate: boolean
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; className?: string
 }) {
   const ref = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    if (ref.current) ref.current.indeterminate = indeterminate
-  }, [indeterminate])
+  useEffect(() => { if (ref.current) ref.current.indeterminate = indeterminate }, [indeterminate])
+  return <input ref={ref} type="checkbox" checked={checked} onChange={onChange} className={className} />
+}
+
+// ─── Sort header ──────────────────────────────────────────────────────────────
+
+function SortTh({ col, label, activeCol, dir, onSort, className }: {
+  col: SortColumn; label: string; activeCol: SortColumn; dir: SortDir
+  onSort: (col: SortColumn) => void; className?: string
+}) {
+  const active = col === activeCol
   return (
-    <input
-      ref={ref}
-      type="checkbox"
-      checked={checked}
-      onChange={onChange}
-      className={className}
-    />
+    <th
+      className={`px-4 py-3 text-gray-500 cursor-pointer select-none hover:text-gray-700 transition-colors ${className ?? ''}`}
+      onClick={() => onSort(col)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {active
+          ? dir === 'asc' ? <ArrowUp size={12} className="text-[#2DBDAA]" /> : <ArrowDown size={12} className="text-[#2DBDAA]" />
+          : <ArrowUpDown size={12} className="opacity-30" />}
+      </span>
+    </th>
   )
 }
 
-export function MaterialsTable({ initialData, filters }: MaterialsTableProps) {
-  const [search, setSearch] = useState('')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [deleteError, setDeleteError] = useState<string | null>(null)
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export function MaterialsTable({ initialData, filters: externalFilters }: MaterialsTableProps) {
+  const [search, setSearch]             = useState('')
+  const [filterCategory, setFilterCategory] = useState('')
+  const [filterType, setFilterType]     = useState('')
+  const [filterSupplier, setFilterSupplier] = useState('')
+  const [sortCol, setSortCol]           = useState<SortColumn>('variantType')
+  const [sortDir, setSortDir]           = useState<SortDir>('asc')
+  const [expandedId, setExpandedId]     = useState<string | null>(null)
+  const [selectedIds, setSelectedIds]   = useState<Set<string>>(new Set())
+  const [deleteError, setDeleteError]   = useState<string | null>(null)
   const queryClient = useQueryClient()
 
-  const queryFilters: MaterialFilters = { ...filters, search: search || undefined }
+  const queryFilters: MaterialFilters = {
+    ...externalFilters,
+    search: search || undefined,
+  }
 
-  const { data: materials, refetch } = useQuery<Material[]>({
+  const { data: allMaterials, refetch } = useQuery<Material[]>({
     queryKey: ['materials', queryFilters],
     queryFn: async () => {
       const params = new URLSearchParams()
-      if (queryFilters.category)   params.set('category', queryFilters.category)
-      if (queryFilters.typeFinish)  params.set('typeFinish', queryFilters.typeFinish)
-      if (queryFilters.supplierId)  params.set('supplierId', queryFilters.supplierId)
-      if (queryFilters.search)      params.set('search', queryFilters.search)
+      if (queryFilters.search) params.set('search', queryFilters.search)
       const res = await fetch(`/api/materials?${params.toString()}`)
       if (!res.ok) throw new Error('Failed to fetch materials')
       const json = await res.json()
       return json.materials
     },
-    initialData: search || filters?.category || filters?.typeFinish ? undefined : initialData,
+    initialData: search ? undefined : initialData,
     staleTime: 30 * 1000,
   })
 
-  const allIds = useMemo(() => (materials ?? []).map((m) => m.id), [materials])
-  const selectedCount = selectedIds.size
-  const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id))
-  const someSelected = selectedCount > 0 && !allSelected
+  // Derive filter options from full dataset
+  const categories = useMemo(() =>
+    [...new Set((allMaterials ?? []).map((m) => m.category))].sort(), [allMaterials])
+  const typeFinishes = useMemo(() =>
+    [...new Set((allMaterials ?? []).filter((m) => !filterCategory || m.category === filterCategory).map((m) => m.typeFinish))].sort(),
+    [allMaterials, filterCategory])
+  const suppliers = useMemo(() =>
+    [...new Set((allMaterials ?? []).map((m) => m.supplier?.name).filter(Boolean) as string[])].sort(), [allMaterials])
 
-  const groups = useMemo(() => groupMaterials(materials ?? []), [materials])
+  // Apply client-side filters then sort
+  const materials = useMemo(() => {
+    let list = allMaterials ?? []
+    if (filterCategory) list = list.filter((m) => m.category === filterCategory)
+    if (filterType)     list = list.filter((m) => m.typeFinish === filterType)
+    if (filterSupplier) list = list.filter((m) => m.supplier?.name === filterSupplier)
+    return sortMaterials(list, sortCol, sortDir)
+  }, [allMaterials, filterCategory, filterType, filterSupplier, sortCol, sortDir])
 
-  const toggleRow = useCallback((id: string) => {
-    setExpandedId((prev) => (prev === id ? null : id))
-  }, [])
+  const groups = useMemo(() => groupMaterials(materials), [materials])
 
-  const toggleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
-      return next
-    })
-  }, [])
+  const hasActiveFilters = !!(filterCategory || filterType || filterSupplier)
 
-  const toggleSelectAll = useCallback(() => {
-    setSelectedIds(allSelected ? new Set() : new Set(allIds))
-  }, [allSelected, allIds])
+  function handleSort(col: SortColumn) {
+    if (col === sortCol) setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+
+  function clearFilters() {
+    setFilterCategory('')
+    setFilterType('')
+    setFilterSupplier('')
+  }
+
+  // Selection
+  const allIds = useMemo(() => materials.map((m) => m.id), [materials])
+  const allSelected  = allIds.length > 0 && allIds.every((id) => selectedIds.has(id))
+  const someSelected = selectedIds.size > 0 && !allSelected
+
+  const toggleRow    = useCallback((id: string) => setExpandedId((p) => p === id ? null : id), [])
+  const toggleSelect = useCallback((id: string) => setSelectedIds((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }), [])
+  const toggleSelectAll = useCallback(() => setSelectedIds(allSelected ? new Set() : new Set(allIds)), [allSelected, allIds])
 
   const handleImportSuccess = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['materials'] })
@@ -143,17 +199,10 @@ export function MaterialsTable({ initialData, filters }: MaterialsTableProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids }),
       })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error ?? 'Delete failed')
-      }
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error ?? 'Delete failed') }
       return res.json() as Promise<{ deleted: number }>
     },
-    onSuccess: () => {
-      setSelectedIds(new Set())
-      setDeleteError(null)
-      void queryClient.invalidateQueries({ queryKey: ['materials'] })
-    },
+    onSuccess: () => { setSelectedIds(new Set()); setDeleteError(null); void queryClient.invalidateQueries({ queryKey: ['materials'] }) },
     onError: (err: Error) => setDeleteError(err.message),
   })
 
@@ -163,38 +212,26 @@ export function MaterialsTable({ initialData, filters }: MaterialsTableProps) {
     deleteMutation.mutate(ids)
   }
 
-  const totalCount = materials?.length ?? 0
+  const totalCount = materials.length
 
   return (
     <div>
       {/* Toolbar */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
-          <SearchInput
-            placeholder="Search materials…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            containerClassName="w-72"
-          />
-          <span className="text-[12px] text-gray-400">
-            {totalCount} material{totalCount !== 1 ? 's' : ''}
-          </span>
+          <SearchInput placeholder="Search materials…" value={search} onChange={(e) => setSearch(e.target.value)} containerClassName="w-72" />
+          <span className="text-[12px] text-gray-400">{totalCount} material{totalCount !== 1 ? 's' : ''}</span>
         </div>
-
         <div className="flex items-center gap-3">
-          {selectedCount > 0 && (
+          {selectedIds.size > 0 && (
             <>
-              <span className="text-[12px] text-gray-500">
-                {selectedCount} selected
-              </span>
+              <span className="text-[12px] text-gray-500">{selectedIds.size} selected</span>
               <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                type="button" onClick={handleDelete} disabled={deleteMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
               >
                 <Trash2 size={13} />
-                {deleteMutation.isPending ? 'Deleting…' : `Delete ${selectedCount}`}
+                {deleteMutation.isPending ? 'Deleting…' : `Delete ${selectedIds.size}`}
               </button>
             </>
           )}
@@ -202,10 +239,47 @@ export function MaterialsTable({ initialData, filters }: MaterialsTableProps) {
         </div>
       </div>
 
+      {/* Filter bar */}
+      <div className="flex items-center gap-2 mb-4">
+        <select
+          value={filterCategory}
+          onChange={(e) => { setFilterCategory(e.target.value); setFilterType('') }}
+          className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
+        >
+          <option value="">All categories</option>
+          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+
+        <select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
+          className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
+        >
+          <option value="">All types</option>
+          {typeFinishes.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+
+        <select
+          value={filterSupplier}
+          onChange={(e) => setFilterSupplier(e.target.value)}
+          className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
+        >
+          <option value="">All suppliers</option>
+          {suppliers.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+
+        {hasActiveFilters && (
+          <button
+            type="button" onClick={clearFilters}
+            className="flex items-center gap-1 text-[12px] text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X size={12} /> Clear filters
+          </button>
+        )}
+      </div>
+
       {deleteError && (
-        <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-[12px] text-red-600">
-          {deleteError}
-        </div>
+        <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-[12px] text-red-600">{deleteError}</div>
       )}
 
       {/* Table */}
@@ -215,21 +289,19 @@ export function MaterialsTable({ initialData, filters }: MaterialsTableProps) {
             <tr style={{ backgroundColor: '#FFFFFF', borderBottom: '1px solid #E5E5E3' }}>
               <th className="px-4 py-3 w-10">
                 <IndeterminateCheckbox
-                  checked={allSelected}
-                  indeterminate={someSelected}
-                  onChange={toggleSelectAll}
-                  className="cursor-pointer accent-[#2DBDAA]"
+                  checked={allSelected} indeterminate={someSelected}
+                  onChange={toggleSelectAll} className="cursor-pointer accent-[#2DBDAA]"
                 />
               </th>
-              <th className="text-left px-4 py-3 text-gray-500 w-[250px]">Description</th>
-              <th className="text-left px-4 py-3 text-gray-500 w-[160px]">Variant Type</th>
-              <th className="text-left px-4 py-3 text-gray-500 w-[160px]">Magento SKU</th>
-              <th className="text-left px-4 py-3 text-gray-500 w-[90px]">Thickness</th>
+              <SortTh col="description"   label="Description"   activeCol={sortCol} dir={sortDir} onSort={handleSort} className="text-left w-[240px]" />
+              <SortTh col="variantType"   label="Variant Type"  activeCol={sortCol} dir={sortDir} onSort={handleSort} className="text-left w-[160px]" />
+              <th className="text-left px-4 py-3 text-gray-500 w-[150px]">Magento SKU</th>
+              <SortTh col="thicknessMm"   label="Thickness"     activeCol={sortCol} dir={sortDir} onSort={handleSort} className="text-left w-[90px]" />
               <th className="text-left px-4 py-3 text-gray-500 w-[130px]">Sheet Size</th>
-              <th className="text-left px-4 py-3 text-gray-500 w-[140px]">Supplier</th>
-              <th className="text-right px-4 py-3 text-gray-500 w-[110px]">Cost/Sheet</th>
+              <SortTh col="supplier"      label="Supplier"      activeCol={sortCol} dir={sortDir} onSort={handleSort} className="text-left w-[130px]" />
+              <SortTh col="costPerSheet"  label="Cost/Sheet"    activeCol={sortCol} dir={sortDir} onSort={handleSort} className="text-right w-[110px]" />
               <th className="text-right px-4 py-3 text-gray-500 w-[110px]">Cost/m²</th>
-              <th className="text-left px-4 py-3 text-gray-500 w-[120px]">Last Updated</th>
+              <SortTh col="lastUpdatedAt" label="Last Updated"  activeCol={sortCol} dir={sortDir} onSort={handleSort} className="text-left w-[120px]" />
               <th className="text-left px-4 py-3 text-gray-500 w-[80px]">Source</th>
               <th className="w-8" />
             </tr>
@@ -237,12 +309,9 @@ export function MaterialsTable({ initialData, filters }: MaterialsTableProps) {
           <tbody>
             {groups.length === 0 && (
               <tr>
-                <td colSpan={12} className="px-4 py-12 text-center text-sm text-gray-400">
-                  No materials found
-                </td>
+                <td colSpan={12} className="px-4 py-12 text-center text-sm text-gray-400">No materials found</td>
               </tr>
             )}
-
             {groups.map((group) => (
               <GroupRows
                 key={`${group.category}::${group.typeFinish}`}
@@ -260,32 +329,21 @@ export function MaterialsTable({ initialData, filters }: MaterialsTableProps) {
   )
 }
 
-function GroupRows({
-  group,
-  expandedId,
-  selectedIds,
-  onToggle,
-  onSelect,
-}: {
-  group: MaterialGroup
-  expandedId: string | null
-  selectedIds: Set<string>
-  onToggle: (id: string) => void
-  onSelect: (id: string) => void
+// ─── Group rows ───────────────────────────────────────────────────────────────
+
+function GroupRows({ group, expandedId, selectedIds, onToggle, onSelect }: {
+  group: MaterialGroup; expandedId: string | null
+  selectedIds: Set<string>; onToggle: (id: string) => void; onSelect: (id: string) => void
 }) {
   return (
     <>
-      {/* Group header row */}
       <tr style={{ backgroundColor: '#EEEEEC' }}>
         <td colSpan={12} className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
           {group.category} — {group.typeFinish}
-          <span className="ml-2 font-normal normal-case tracking-normal text-gray-400">
-            ({group.materials.length})
-          </span>
+          <span className="ml-2 font-normal normal-case tracking-normal text-gray-400">({group.materials.length})</span>
         </td>
       </tr>
 
-      {/* Material rows */}
       {group.materials.map((material) => {
         const isExpanded = expandedId === material.id
         const isSelected = selectedIds.has(material.id)
@@ -297,68 +355,34 @@ function GroupRows({
               onClick={() => onToggle(material.id)}
               className="cursor-pointer border-b border-[#F0F0EE] transition-colors duration-100"
               style={{ backgroundColor: isSelected ? '#F0FAF8' : isExpanded ? '#F0F0EE' : undefined }}
-              onMouseEnter={(e) => {
-                if (!isExpanded && !isSelected) {
-                  ;(e.currentTarget as HTMLTableRowElement).style.backgroundColor = '#F0F0EE'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isExpanded && !isSelected) {
-                  ;(e.currentTarget as HTMLTableRowElement).style.backgroundColor = ''
-                }
-              }}
+              onMouseEnter={(e) => { if (!isExpanded && !isSelected) (e.currentTarget as HTMLTableRowElement).style.backgroundColor = '#F0F0EE' }}
+              onMouseLeave={(e) => { if (!isExpanded && !isSelected) (e.currentTarget as HTMLTableRowElement).style.backgroundColor = '' }}
             >
-              <td
-                className="px-4 py-3"
-                onClick={(e) => { e.stopPropagation(); onSelect(material.id) }}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => onSelect(material.id)}
-                  className="cursor-pointer accent-[#2DBDAA]"
-                />
+              <td className="px-4 py-3" onClick={(e) => { e.stopPropagation(); onSelect(material.id) }}>
+                <input type="checkbox" checked={isSelected} onChange={() => onSelect(material.id)} className="cursor-pointer accent-[#2DBDAA]" />
               </td>
-              <td className="px-4 py-3 text-[13px] text-gray-900 font-medium">
-                {material.description}
+              <td className="px-4 py-3 text-[13px] text-gray-900 font-medium">{material.description}</td>
+              <td className="px-4 py-3">
+                {material.variantType
+                  ? <span className="text-[12px] text-gray-600">{material.variantType}</span>
+                  : <span className="text-[12px] text-gray-300">—</span>}
               </td>
               <td className="px-4 py-3">
-                {material.variantType ? (
-                  <span className="text-[12px] text-gray-600">{material.variantType}</span>
-                ) : (
-                  <span className="text-[12px] text-gray-300">—</span>
-                )}
-              </td>
-              <td className="px-4 py-3">
-                {material.magentoSku ? (
-                  <span className="font-mono text-[12px] text-gray-400">{material.magentoSku}</span>
-                ) : (
-                  <span className="text-[12px] text-gray-300">—</span>
-                )}
+                {material.magentoSku
+                  ? <span className="font-mono text-[12px] text-gray-400">{material.magentoSku}</span>
+                  : <span className="text-[12px] text-gray-300">—</span>}
               </td>
               <td className="px-4 py-3 text-[13px] text-gray-600">{material.thicknessMm}mm</td>
-              <td className="px-4 py-3 text-[13px] text-gray-600">
-                {material.widthMm} × {material.heightMm}mm
-              </td>
-              <td className="px-4 py-3 text-[13px] text-gray-600">
-                {material.supplier?.name ?? '—'}
+              <td className="px-4 py-3 text-[13px] text-gray-600">{material.widthMm} × {material.heightMm}mm</td>
+              <td className="px-4 py-3 text-[13px] text-gray-600">{material.supplier?.name ?? '—'}</td>
+              <td className="px-4 py-3 text-right">
+                <span className="cost-cell tabular-nums text-gray-900">{formatCurrency(material.costPerSheet)}</span>
               </td>
               <td className="px-4 py-3 text-right">
-                <span className="cost-cell tabular-nums text-gray-900">
-                  {formatCurrency(material.costPerSheet)}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-right">
-                <span className="cost-cell tabular-nums text-gray-500">
-                  {formatM2Cost(material.costPerM2)}
-                </span>
+                <span className="cost-cell tabular-nums text-gray-500">{formatM2Cost(material.costPerM2)}</span>
               </td>
               <td className="px-4 py-3">
-                <time
-                  dateTime={material.lastUpdatedAt}
-                  title={format(lastUpdated, 'dd MMM yyyy HH:mm')}
-                  className="text-[13px] text-gray-500"
-                >
+                <time dateTime={material.lastUpdatedAt} title={format(lastUpdated, 'dd MMM yyyy HH:mm')} className="text-[13px] text-gray-500">
                   {formatDistanceToNow(lastUpdated, { addSuffix: true })}
                 </time>
               </td>
@@ -374,10 +398,7 @@ function GroupRows({
               <tr>
                 <td colSpan={12} className="p-0 border-b border-[#E5E5E3]">
                   <div className="slide-down">
-                    <CostHistoryPanel
-                      materialId={material.id}
-                      materialDescription={material.description}
-                    />
+                    <CostHistoryPanel materialId={material.id} materialDescription={material.description} />
                   </div>
                 </td>
               </tr>
