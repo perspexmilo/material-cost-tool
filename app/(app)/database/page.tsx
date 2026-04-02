@@ -16,7 +16,7 @@ export default async function DatabasePage() {
   return (
     <>
       <TopBar title="Material Database" />
-      <main className="flex flex-col h-[calc(100vh-48px)] p-6">
+      <main className="flex flex-col min-h-[calc(100vh-48px)] p-6">
         <MaterialsTable initialData={initialMaterials} />
       </main>
     </>

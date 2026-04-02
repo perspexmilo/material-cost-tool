@@ -20,31 +20,41 @@ export function Sidebar({ stagedCount = 0 }: SidebarProps) {
 
   return (
     <aside
-      className="fixed left-0 top-0 h-screen w-[240px] flex flex-col z-30"
-      style={{ backgroundColor: '#1C1E22' }}
+      className="fixed left-0 top-0 h-screen w-[240px] flex flex-col z-30 shadow-2xl shadow-black/50"
+      style={{
+        background: 'linear-gradient(180deg, #1C1E22 0%, #14161A 100%)',
+        boxShadow: '4px 0 24px rgba(0, 0, 0, 0.4)'
+      }}
     >
       {/* Brand */}
-      <div className="flex items-center h-12 px-4 border-b border-white/5">
+      <div className="flex items-center h-14 px-5 border-b border-white/[0.03]">
         <div
-          className="w-6 h-6 rounded flex items-center justify-center mr-2.5 shrink-0"
-          style={{ backgroundColor: '#2DBDAA' }}
+          className="w-7 h-7 rounded-lg flex items-center justify-center mr-3 shrink-0 shadow-lg shadow-[#2DBDAA]/20"
+          style={{
+            background: 'linear-gradient(135deg, #2DBDAA 0%, #249A8B 100%)'
+          }}
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <svg width="16" height="16" viewBox="0 0 14 14" fill="none">
             <path
               d="M2 7L7 2L12 7M3.5 6V11H10.5V6"
               stroke="white"
-              strokeWidth="1.25"
+              strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
           </svg>
         </div>
-        <span className="text-white text-sm font-semibold tracking-tight">CutMy</span>
-        <span className="text-[#C8CAD0] text-sm font-normal ml-1">Costs</span>
+        <div>
+          <div className="flex items-center leading-none">
+            <span className="text-white text-[15px] font-bold tracking-tight">CutMy</span>
+            <span className="text-[#2DBDAA] text-[15px] font-medium ml-1">Costs</span>
+          </div>
+          <div className="text-[10px] text-gray-500 font-medium uppercase tracking-widest mt-1 opacity-60">System v0.1</div>
+        </div>
       </div>
-
+ 
       {/* Nav */}
-      <nav className="px-2 pt-3 pb-2 flex-1">
+      <nav className="px-3 pt-6 pb-2 flex-1 space-y-1">
         {NAV_ITEMS.map(({ href, label, icon: Icon, badge }) => {
           const isActive = pathname.startsWith(href)
           return (
@@ -52,18 +62,24 @@ export function Sidebar({ stagedCount = 0 }: SidebarProps) {
               key={href}
               href={href}
               className={clsx(
-                'sidebar-nav-item flex items-center gap-2.5 px-3 py-2 rounded-lg mb-0.5 transition-colors duration-150',
+                'group flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 border border-transparent',
                 isActive
-                  ? 'active bg-white/8 text-white'
-                  : 'hover:bg-white/5 hover:text-white'
+                  ? 'bg-white/[0.08] text-white border-white/[0.05] shadow-lg shadow-black/20'
+                  : 'text-[#C8CAD0] hover:bg-white/[0.04] hover:text-white'
               )}
             >
-              <Icon size={15} className="shrink-0" />
-              <span className="flex-1 text-[13px]">{label}</span>
+              <Icon
+                size={18}
+                className={clsx(
+                  'shrink-0 transition-transform duration-200 group-hover:scale-110',
+                  isActive ? 'text-[#2DBDAA]' : 'text-[#8E9196]'
+                )}
+              />
+              <span className="flex-1 text-[13.5px] font-medium">{label}</span>
               {badge && stagedCount > 0 && (
                 <span
-                  className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none"
-                  style={{ backgroundColor: '#2DBDAA', color: 'white' }}
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full leading-none shadow-sm"
+                  style={{ background: 'linear-gradient(135deg, #2DBDAA 0%, #249A8B 100%)', color: 'white' }}
                 >
                   {stagedCount}
                 </span>
@@ -72,10 +88,18 @@ export function Sidebar({ stagedCount = 0 }: SidebarProps) {
           )
         })}
       </nav>
-
+ 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-white/5">
-        <p className="text-[11px]" style={{ color: '#3D4048' }}>v0.1.0</p>
+      <div className="px-5 py-4 border-t border-white/[0.03] bg-black/10">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 border border-white/10 flex items-center justify-center text-[11px] font-bold text-gray-400">
+            MM
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[12px] font-medium text-gray-300 truncate">Milo McCardle</p>
+            <p className="text-[10px] text-gray-500 truncate">Administrator</p>
+          </div>
+        </div>
       </div>
     </aside>
   )

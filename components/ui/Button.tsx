@@ -17,13 +17,13 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    'bg-[#1C1E22] text-white hover:bg-[#2A2D33] active:bg-[#14161A] disabled:opacity-50',
+    'bg-[#1C1E22] text-white hover:bg-[#2A2D33] active:bg-[#14161A] disabled:opacity-50 shadow-md shadow-black/10 hover:shadow-lg transition-all duration-200',
   secondary:
-    'bg-white text-[#1C1E22] border border-[#E5E5E3] hover:bg-[#F7F7F5] active:bg-[#EEEEEC] disabled:opacity-50',
+    'bg-white text-[#1C1E22] border border-[#E5E5E3] hover:bg-[#F7F7F5] active:bg-[#EEEEEC] disabled:opacity-50 shadow-sm hover:shadow-md transition-all duration-200',
   destructive:
-    'bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50 active:bg-red-100 disabled:opacity-50',
+    'bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50 active:bg-red-100 disabled:opacity-50 transition-colors',
   ghost:
-    'bg-transparent text-[#6B7280] hover:text-[#1C1E22] hover:bg-[#F7F7F5] active:bg-[#EEEEEC] disabled:opacity-50',
+    'bg-transparent text-[#6B7280] hover:text-[#1C1E22] hover:bg-[#F7F7F5] active:bg-[#EEEEEC] disabled:opacity-50 transition-colors',
 }
 
 const sizeClasses: Record<ButtonSize, string> = {

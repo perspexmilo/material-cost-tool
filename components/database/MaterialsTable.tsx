@@ -215,9 +215,10 @@ export function MaterialsTable({ initialData, filters: externalFilters }: Materi
   const totalCount = materials.length
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col">
       {/* Toolbar */}
-      <div className="flex-none flex items-center justify-between mb-3">
+      <div className="sticky top-12 z-20 bg-[#F7F7F5] pt-1 pb-3">
+        <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <SearchInput placeholder="Search materials…" value={search} onChange={(e) => setSearch(e.target.value)} containerClassName="w-72" />
           <span className="text-[12px] text-gray-400">{totalCount} material{totalCount !== 1 ? 's' : ''}</span>
@@ -237,10 +238,11 @@ export function MaterialsTable({ initialData, filters: externalFilters }: Materi
           )}
           <ImportDialog onSuccess={handleImportSuccess} />
         </div>
+        </div>
       </div>
 
       {/* Filter bar */}
-      <div className="flex-none flex items-center gap-2 mb-4">
+      <div className="sticky top-[108px] z-20 bg-[#F7F7F5] pb-4 flex items-center gap-2">
         <select
           value={filterCategory}
           onChange={(e) => { setFilterCategory(e.target.value); setFilterType('') }}
@@ -283,9 +285,9 @@ export function MaterialsTable({ initialData, filters: externalFilters }: Materi
       )}
 
       {/* Table */}
-      <div className="flex-1 overflow-y-auto min-h-0 bg-white rounded-xl border border-[#E5E5E3]">
-        <table className="w-full data-table relative">
-          <thead className="sticky top-0 z-10 bg-white shadow-sm ring-1 ring-black/5">
+      <div className="bg-white rounded-xl border border-[#E5E5E3] overflow-hidden">
+        <table className="w-full data-table relative border-collapse">
+          <thead className="sticky top-[156px] z-10 bg-white shadow-[0_1px_0_rgba(0,0,0,0.05)]">
             <tr style={{ backgroundColor: '#FFFFFF', boxShadow: 'inset 0 -1px 0 #E5E5E3' }}>
               <th className="px-4 py-3 w-10">
                 <IndeterminateCheckbox
