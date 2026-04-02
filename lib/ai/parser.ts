@@ -60,6 +60,11 @@ const extractionTool: Anthropic.Tool = {
               type: 'string',
               description: 'SHORT clean product identifier — brand/material/grade only (e.g. "Medite Premier MDF", "Clear Acrylic"). Strip qualifiers like "all products", "excl. X", "range", "items" etc.',
             },
+            thicknesses: {
+              type: 'array',
+              items: { type: 'number' },
+              description: 'List of any specific material thicknesses explicitly mentioned (e.g. [3, 5] for "3 and 5 mm", or [6] for "6mm"). Leave empty if no specific thicknesses are mentioned.',
+            },
             exclusions: {
               type: 'array',
               items: { type: 'string' },
@@ -92,7 +97,7 @@ const extractionTool: Anthropic.Tool = {
               description: 'Confidence level in the extraction accuracy',
             },
           },
-          required: ['name', 'manufacturer', 'changeType', 'changeValue', 'effectiveDate', 'rawText', 'confidence', 'exclusions'],
+          required: ['name', 'manufacturer', 'changeType', 'changeValue', 'effectiveDate', 'rawText', 'confidence', 'exclusions', 'thicknesses'],
         },
         description: 'List of product ranges with price changes',
       },
@@ -103,6 +108,7 @@ const extractionTool: Anthropic.Tool = {
 
 interface ExtractedRange {
   name: string
+  thicknesses: number[]
   exclusions: string[]
   manufacturer: string
   changeType: 'percentage' | 'absolute'
@@ -142,6 +148,14 @@ const RANGE_STOP_WORDS = new Set([
   'price', 'prices', 'increase', 'decrease', 'update', 'change',
 ])
 
+// Core material nouns that define the fundamental type of a product.
+// If a range explicitly names one of these, we strictly require the material description
+// to also contain it, otherwise we instantly reject the match.
+const MATERIAL_NOUNS = new Set([
+  'acrylic', 'polycarbonate', 'poly', 'mdf', 'plywood', 'ply', 'osb',
+  'foam', 'pvc', 'dibond', 'acm', 'chipboard', 'mfc', 'timber'
+])
+
 function fuzzyScore(rangeName: string, materialDescription: string): number {
   const range = rangeName.toLowerCase()
   const desc = materialDescription.toLowerCase()
@@ -156,6 +170,15 @@ function fuzzyScore(rangeName: string, materialDescription: string): number {
     .filter((w) => w.length > 2 && !RANGE_STOP_WORDS.has(w))
   const descWords = desc.split(/\s+/).filter((w) => w.length > 2)
   if (rangeWords.length === 0) return 0
+
+  // Strict check: if the range explicitly specifies a core material type,
+  // the description must contain it, or we immediately reject the match.
+  const requiredNouns = rangeWords.filter((w) => MATERIAL_NOUNS.has(w))
+  for (const noun of requiredNouns) {
+    if (!descWords.some((d) => d.includes(noun) || noun.includes(d))) {
+      return 0 // Total mismatch on a core material type
+    }
+  }
 
   const matches = rangeWords.filter((w) => descWords.some((d) => d.includes(w) || w.includes(d)))
   // Score = fraction of the range name's meaningful words that matched.
@@ -245,18 +268,18 @@ export async function parseEmail(emailBody: string): Promise<ParseResult> {
     //    a range-level description (e.g. "Clear Acrylic") resolves every thickness.
     //    Skip any material whose description matches an exclusion word from the email.
     const exclusionWords = (range.exclusions ?? []).map((e) => e.toLowerCase())
-    // If the range name specifies a thickness (e.g. "6mm"), treat it as a hard
-    // filter — don't fuzzy-match 9mm or 12mm just because the other words score well.
-    const thicknessMatch = range.name.match(/(\d+(?:\.\d+)?)\s*mm/i)
-    const requiredThickness = thicknessMatch ? parseFloat(thicknessMatch[1]) : null
 
     const candidateMaterials = allMaterials.filter((m) => {
       // Skip materials with no cost set — percentage changes would resolve to £0.00
       if (m.costPerSheet <= 0) return false
       // Skip materials whose description matches an exclusion from the email
       if (exclusionWords.some((ex) => m.description.toLowerCase().includes(ex))) return false
-      // Enforce exact thickness when one is specified in the range name
-      if (requiredThickness !== null && Math.abs(m.thicknessMm - requiredThickness) > 0.01) return false
+      // Enforce exact thickness when array of thicknesses is specified in the range
+      if (range.thicknesses && range.thicknesses.length > 0) {
+        // Must match at least one of the extracted thicknesses
+        const matchesThickness = range.thicknesses.some((reqThick) => Math.abs(m.thicknessMm - reqThick) < 0.01)
+        if (!matchesThickness) return false
+      }
       return true
     })
 
