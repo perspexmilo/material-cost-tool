@@ -21,9 +21,9 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
-      if (typeof change.proposedCost !== 'number' || change.proposedCost <= 0) {
+      if (typeof change.proposedCost !== 'number' || change.proposedCost < 0) {
         return NextResponse.json(
-          { error: 'Each change must have a positive proposedCost', code: 'VALIDATION_ERROR' },
+          { error: 'Each change must have a non-negative proposedCost', code: 'VALIDATION_ERROR' },
           { status: 400 }
         )
       }
