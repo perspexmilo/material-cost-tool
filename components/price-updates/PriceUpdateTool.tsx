@@ -168,7 +168,7 @@ export function PriceUpdateTool() {
             <div className="space-y-2">
               {parseResult.manufacturers.length > 0 && (
                 <div>
-                  <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Manufacturers</p>
+                  <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Suppliers</p>
                   <div className="flex flex-wrap gap-1">
                     {parseResult.manufacturers.map((m) => (
                       <span

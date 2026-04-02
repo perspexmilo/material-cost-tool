@@ -21,7 +21,9 @@ CutMy purchases sheet materials including:
 EXTRACTION RULES:
 1. Extract the supplier/manufacturer name(s) mentioned in the email
 2. For each product range or material type with a price change:
-   - Identify the product name/range as precisely as possible
+   - Extract a SHORT, CLEAN product identifier as the name — just the brand/material/grade (e.g. "Medite Premier MDF", "Clear Acrylic", "Birch Plywood"). NEVER include qualifiers like "all products", "all ranges", "excl. X", "with the exception of", "range", "items" etc. in the name field.
+   - If certain products are excluded (e.g. "excl. Trade and Tricoya"), list them in the exclusions field — do NOT put them in the name.
+   - If the email says "all products" with no brand/material qualifier, use the manufacturer name as the range name (e.g. "Medite").
    - Determine if the change is a percentage (%) or absolute amount (£/currency)
    - Extract the change value (positive = increase, negative = decrease)
    - Find the effective date if mentioned (ISO 8601 format YYYY-MM-DD, or null if immediate/not specified)
@@ -56,7 +58,12 @@ const extractionTool: Anthropic.Tool = {
           properties: {
             name: {
               type: 'string',
-              description: 'Product range or material name as stated in the email',
+              description: 'SHORT clean product identifier — brand/material/grade only (e.g. "Medite Premier MDF", "Clear Acrylic"). Strip qualifiers like "all products", "excl. X", "range", "items" etc.',
+            },
+            exclusions: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Product names or grades explicitly excluded from this price change (e.g. ["Trade", "Tricoya"])',
             },
             manufacturer: {
               type: 'string',
@@ -85,7 +92,7 @@ const extractionTool: Anthropic.Tool = {
               description: 'Confidence level in the extraction accuracy',
             },
           },
-          required: ['name', 'manufacturer', 'changeType', 'changeValue', 'effectiveDate', 'rawText', 'confidence'],
+          required: ['name', 'manufacturer', 'changeType', 'changeValue', 'effectiveDate', 'rawText', 'confidence', 'exclusions'],
         },
         description: 'List of product ranges with price changes',
       },
@@ -96,6 +103,7 @@ const extractionTool: Anthropic.Tool = {
 
 interface ExtractedRange {
   name: string
+  exclusions: string[]
   manufacturer: string
   changeType: 'percentage' | 'absolute'
   changeValue: number
@@ -126,15 +134,26 @@ function calculateChangePercent(currentCost: number, proposedCost: number): numb
  * Fuzzy text match — returns a score 0–1 based on how well the range name matches
  * a material description. Higher = better match.
  */
+// Generic words that appear in email prose but carry no product identity signal
+const RANGE_STOP_WORDS = new Set([
+  'all', 'products', 'product', 'range', 'ranges', 'items', 'item',
+  'excl', 'except', 'excluding', 'exception', 'including', 'inclusive',
+  'and', 'the', 'with', 'without', 'other', 'new', 'standard', 'our',
+  'price', 'prices', 'increase', 'decrease', 'update', 'change',
+])
+
 function fuzzyScore(rangeName: string, materialDescription: string): number {
   const range = rangeName.toLowerCase()
   const desc = materialDescription.toLowerCase()
 
   if (desc.includes(range) || range.includes(desc)) return 0.9
 
-  // Filter out short words (≤ 2 chars) to prevent single letters like "a" in
-  // "Type A Beading" from matching as a substring of "clear" or "acrylic".
-  const rangeWords = range.split(/\s+/).filter((w) => w.length > 2)
+  // Filter out short words (≤ 2 chars) AND generic prose words so that a range
+  // name like "Medite All Products (excl. Trade)" scores purely on "medite".
+  const rangeWords = range
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-z0-9]/g, ''))
+    .filter((w) => w.length > 2 && !RANGE_STOP_WORDS.has(w))
   const descWords = desc.split(/\s+/).filter((w) => w.length > 2)
   if (rangeWords.length === 0) return 0
 
@@ -214,7 +233,13 @@ export async function parseEmail(emailBody: string): Promise<ParseResult> {
 
     // 5. Fuzzy match against all materials — return ALL good matches so that
     //    a range-level description (e.g. "Clear Acrylic") resolves every thickness.
-    const scored = allMaterials
+    //    Skip any material whose description matches an exclusion word from the email.
+    const exclusionWords = (range.exclusions ?? []).map((e) => e.toLowerCase())
+    const candidateMaterials = exclusionWords.length > 0
+      ? allMaterials.filter((m) => !exclusionWords.some((ex) => m.description.toLowerCase().includes(ex)))
+      : allMaterials
+
+    const scored = candidateMaterials
       .map((m) => ({ material: m, score: fuzzyScore(range.name, m.description) }))
       .filter((s) => s.score > 0.3)
       .sort((a, b) => b.score - a.score)
