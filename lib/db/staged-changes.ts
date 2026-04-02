@@ -115,8 +115,9 @@ export async function applyStagedChanges(): Promise<{ applied: number; errors: s
             materialId: sc.materialId,
             previousCost: sc.material.costPerSheet,
             newCost: sc.proposedCost,
+            effectiveDate: sc.effectiveDate,
             updateSource: 'staged',
-            notes: sc.notes ?? `Applied from staged change (effective ${sc.effectiveDate.toISOString().split('T')[0]})`,
+            notes: sc.notes,
           },
         }),
         prisma.stagedChange.delete({

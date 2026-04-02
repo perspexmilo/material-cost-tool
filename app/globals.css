@@ -128,7 +128,7 @@ body {
 
 .history-timeline-dot {
   position: absolute;
-  left: 0;
+  left: -17px;
   top: 4px;
   width: 14px;
   height: 14px;

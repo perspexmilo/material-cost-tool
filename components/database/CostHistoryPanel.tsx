@@ -80,22 +80,38 @@ export function CostHistoryPanel({ materialId, materialDescription }: CostHistor
             const isIncrease = changeAmount > 0
             const changedAt = new Date(entry.changedAt)
 
+            const effectiveDate = entry.effectiveDate ? new Date(entry.effectiveDate) : null
+            const sameDay = effectiveDate
+              ? format(changedAt, 'yyyy-MM-dd') === format(effectiveDate, 'yyyy-MM-dd')
+              : true
+
             return (
               <div key={entry.id} className="relative mb-5 last:mb-0">
                 <div className="history-timeline-dot" />
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    {/* Date */}
-                    <time
-                      dateTime={entry.changedAt}
-                      title={format(changedAt, 'dd MMM yyyy HH:mm')}
-                      className="text-[12px] text-gray-500 block mb-1"
-                    >
-                      {idx === 0 ? (
-                        <span className="font-medium text-gray-700">Latest — </span>
-                      ) : null}
-                      {formatDistanceToNow(changedAt, { addSuffix: true })}
-                    </time>
+                    {/* Dates */}
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <time
+                        dateTime={entry.changedAt}
+                        className="text-[12px] text-gray-500"
+                      >
+                        <span className="text-[11px] text-gray-400 mr-1">Inputted</span>
+                        {format(changedAt, 'dd MMM yyyy')}
+                      </time>
+                      {effectiveDate && !sameDay && (
+                        <>
+                          <span className="text-gray-300 text-[11px]">·</span>
+                          <time
+                            dateTime={entry.effectiveDate!}
+                            className="text-[12px] text-gray-500"
+                          >
+                            <span className="text-[11px] text-gray-400 mr-1">Effective</span>
+                            {format(effectiveDate, 'dd MMM yyyy')}
+                          </time>
+                        </>
+                      )}
+                    </div>
 
                     {/* Cost change */}
                     <div className="flex items-center gap-2">

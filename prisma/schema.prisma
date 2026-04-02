@@ -56,13 +56,14 @@ model Material {
 }
 
 model CostHistory {
-  id           String   @id @default(cuid())
-  materialId   String   @map("material_id")
-  previousCost Decimal  @map("previous_cost") @db.Decimal(10, 2)
-  newCost      Decimal  @map("new_cost") @db.Decimal(10, 2)
-  changedAt    DateTime @default(now()) @map("changed_at")
-  updateSource String   @map("update_source") // "manual" | "email-parse" | "import" | "staged"
-  notes        String?
+  id            String    @id @default(cuid())
+  materialId    String    @map("material_id")
+  previousCost  Decimal   @map("previous_cost") @db.Decimal(10, 2)
+  newCost       Decimal   @map("new_cost") @db.Decimal(10, 2)
+  changedAt     DateTime  @default(now()) @map("changed_at")
+  effectiveDate DateTime? @map("effective_date")
+  updateSource  String    @map("update_source") // "manual" | "email-parse" | "import" | "staged"
+  notes         String?
 
   material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
 

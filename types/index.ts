@@ -37,6 +37,7 @@ export interface CostHistory {
   previousCost: number
   newCost: number
   changedAt: string
+  effectiveDate?: string | null
   updateSource: UpdateSource
   notes?: string | null
 }

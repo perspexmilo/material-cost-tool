@@ -111,6 +111,7 @@ export async function getCostHistory(materialId: string) {
     previousCost: h.previousCost.toNumber(),
     newCost: h.newCost.toNumber(),
     changedAt: h.changedAt.toISOString(),
+    effectiveDate: h.effectiveDate?.toISOString() ?? null,
     updateSource: h.updateSource as Material['updateSource'],
     notes: h.notes,
   }))
@@ -172,6 +173,7 @@ export async function bulkUpdateMaterials(changes: UpdateChange[]): Promise<{
               materialId: change.materialId,
               previousCost: material.costPerSheet,
               newCost: change.proposedCost,
+              effectiveDate: effectiveDate ?? new Date(),
               updateSource: change.updateSource ?? 'email-parse',
               notes: change.notes,
             },
