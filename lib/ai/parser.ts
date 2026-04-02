@@ -21,7 +21,7 @@ CutMy purchases sheet materials including:
 EXTRACTION RULES:
 1. Extract the supplier/manufacturer name(s) mentioned in the email
 2. For each product range or material type with a price change:
-   - Extract a SHORT, CLEAN product identifier as the name — just the brand/material/grade (e.g. "Medite Premier MDF", "Clear Acrylic", "Birch Plywood"). NEVER include qualifiers like "all products", "all ranges", "excl. X", "with the exception of", "range", "items" etc. in the name field.
+   - Extract a SHORT, CLEAN product identifier as the name — brand/material/grade, and include the thickness if one is explicitly stated (e.g. "6mm Birch Plywood", "Medite Premier MDF", "Clear Acrylic"). If NO specific thickness is mentioned, do NOT add one. NEVER include qualifiers like "all products", "all ranges", "excl. X", "with the exception of", "range", "items" etc. in the name field.
    - If certain products are excluded (e.g. "excl. Trade and Tricoya"), list them in the exclusions field — do NOT put them in the name.
    - If the email says "all products" with no brand/material qualifier, use the manufacturer name as the range name (e.g. "Medite").
    - Determine if the change is a percentage (%) or absolute amount (£/currency)
@@ -239,11 +239,18 @@ export async function parseEmail(emailBody: string): Promise<ParseResult> {
     //    a range-level description (e.g. "Clear Acrylic") resolves every thickness.
     //    Skip any material whose description matches an exclusion word from the email.
     const exclusionWords = (range.exclusions ?? []).map((e) => e.toLowerCase())
+    // If the range name specifies a thickness (e.g. "6mm"), treat it as a hard
+    // filter — don't fuzzy-match 9mm or 12mm just because the other words score well.
+    const thicknessMatch = range.name.match(/(\d+(?:\.\d+)?)\s*mm/i)
+    const requiredThickness = thicknessMatch ? parseFloat(thicknessMatch[1]) : null
+
     const candidateMaterials = allMaterials.filter((m) => {
       // Skip materials with no cost set — percentage changes would resolve to £0.00
       if (m.costPerSheet <= 0) return false
       // Skip materials whose description matches an exclusion from the email
       if (exclusionWords.some((ex) => m.description.toLowerCase().includes(ex))) return false
+      // Enforce exact thickness when one is specified in the range name
+      if (requiredThickness !== null && Math.abs(m.thicknessMm - requiredThickness) > 0.01) return false
       return true
     })
 
