@@ -185,18 +185,19 @@ export function ReviewTable({ parseResult, onCommitSuccess }: ReviewTableProps) 
   const allSelected = rows.length > 0 && rows.every((r) => r.selected)
 
   return (
-    <div>
+    <div className="flex flex-col h-full gap-4">
       {/* Resolved table */}
       {rows.length > 0 && (
-        <div className="bg-white rounded-xl border border-[#E5E5E3] overflow-hidden mb-4">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E5E3]">
+        <div className="flex-1 flex flex-col min-h-0 bg-white rounded-xl border border-[#E5E5E3] overflow-hidden">
+          <div className="flex-none flex items-center justify-between px-4 py-3 border-b border-[#E5E5E3] bg-white z-10">
             <h3 className="text-[12px] font-semibold uppercase tracking-wider text-gray-500">
               Matched ({rows.length})
             </h3>
           </div>
-          <table className="w-full data-table">
-            <thead>
-              <tr style={{ borderBottom: '1px solid #E5E5E3' }}>
+          <div className="flex-1 overflow-y-auto">
+            <table className="w-full data-table relative">
+              <thead className="sticky top-0 z-10 bg-white shadow-sm ring-1 ring-black/5">
+                <tr style={{ backgroundColor: '#FFFFFF', boxShadow: 'inset 0 -1px 0 #E5E5E3' }}>
                 <th className="px-4 py-3 w-8">
                   <input
                     type="checkbox"
@@ -306,18 +307,19 @@ export function ReviewTable({ parseResult, onCommitSuccess }: ReviewTableProps) 
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
       {/* Unresolved section */}
       {unresolvedRows.length > 0 && (
-        <div className="bg-white rounded-xl border border-[#E5E5E3] overflow-hidden mb-4">
-          <div className="px-4 py-3 border-b border-[#E5E5E3]">
+        <div className="flex-none bg-white rounded-xl border border-[#E5E5E3] overflow-hidden">
+          <div className="px-4 py-3 border-b border-[#E5E5E3] bg-white">
             <h3 className="text-[12px] font-semibold uppercase tracking-wider text-gray-500">
               Unresolved ({unresolvedRows.length}) — map manually
             </h3>
           </div>
-          <div className="divide-y divide-[#F0F0EE]">
+          <div className="max-h-64 overflow-y-auto divide-y divide-[#F0F0EE]">
             {unresolvedRows.map((u, idx) => (
               <div key={idx} className="px-4 py-4">
                 <div className="flex items-start gap-4">
@@ -362,7 +364,7 @@ export function ReviewTable({ parseResult, onCommitSuccess }: ReviewTableProps) 
       )}
 
       {/* Commit bar */}
-      <div className="flex items-center justify-between bg-white rounded-xl border border-[#E5E5E3] px-4 py-3">
+      <div className="flex-none flex items-center justify-between bg-white rounded-xl border border-[#E5E5E3] px-4 py-3">
         <p className="text-[13px] text-gray-500">
           {totalToCommit} update{totalToCommit !== 1 ? 's' : ''} ready to commit
           {rows.some((r) => r.selected && r.effectiveDate) && (

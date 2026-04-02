@@ -16,8 +16,8 @@ export default async function StagedChangesPage() {
   return (
     <>
       <TopBar title="Staged Changes" />
-      <main className="px-6 py-6">
-        <div className="mb-4">
+      <main className="flex flex-col h-[calc(100vh-48px)] p-6 gap-4">
+        <div className="flex-none">
           <p className="text-[13px] text-gray-500">
             Future-dated price changes waiting to be applied. They are automatically committed at 06:00 UTC on their effective date.
           </p>

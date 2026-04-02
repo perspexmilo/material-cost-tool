@@ -5,7 +5,7 @@ export default function PriceUpdatesPage() {
   return (
     <>
       <TopBar title="Price Updates" />
-      <main className="px-6 py-6">
+      <main className="flex flex-col h-[calc(100vh-48px)] p-6">
         <PriceUpdateTool />
       </main>
     </>

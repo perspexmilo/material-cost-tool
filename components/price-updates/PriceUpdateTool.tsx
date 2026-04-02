@@ -53,9 +53,9 @@ export function PriceUpdateTool() {
   const hasContent = emailBody.trim().length > 0
 
   return (
-    <div className="flex gap-6 min-h-[calc(100vh-48px-64px)]">
+    <div className="flex gap-6 h-full overflow-hidden">
       {/* Left panel — 38% */}
-      <div className="w-[38%] shrink-0 flex flex-col gap-4">
+      <div className="w-[38%] shrink-0 flex flex-col gap-4 overflow-y-auto pr-1">
         <div className="bg-white rounded-xl border border-[#E5E5E3] overflow-hidden">
           {/* Tab bar */}
           <div className="flex border-b border-[#E5E5E3]">
@@ -216,7 +216,7 @@ export function PriceUpdateTool() {
       </div>
 
       {/* Right panel — 62% */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 flex flex-col h-full">
         {!parseResult && !parseMutation.isPending && (
           <div className="flex items-center justify-center h-full min-h-64">
             <div className="text-center">
@@ -247,7 +247,7 @@ export function PriceUpdateTool() {
         )}
 
         {parseResult && !parseMutation.isPending && (
-          <div className="fade-in">
+          <div className="fade-in flex flex-col flex-1 min-h-0">
             {parseResult.resolved.length === 0 && parseResult.unresolved.length === 0 ? (
               <div className="flex items-center justify-center h-64">
                 <div className="text-center">

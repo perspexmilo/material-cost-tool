@@ -59,8 +59,8 @@ export function StagedChangesTable({ initialData }: StagedChangesTableProps) {
 
   if (!changes || changes.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-[#E5E5E3]">
-        <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
+      <div className="flex-1 bg-white rounded-xl border border-[#E5E5E3]">
+        <div className="flex flex-col h-full items-center justify-center py-16 px-8 text-center">
           <div
             className="w-12 h-12 rounded-full flex items-center justify-center mb-4"
             style={{ backgroundColor: '#EEEEEC' }}
@@ -77,10 +77,11 @@ export function StagedChangesTable({ initialData }: StagedChangesTableProps) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-[#E5E5E3] overflow-hidden">
-      <table className="w-full data-table">
-        <thead>
-          <tr style={{ borderBottom: '1px solid #E5E5E3' }}>
+    <div className="flex-1 flex flex-col min-h-0 bg-white rounded-xl border border-[#E5E5E3] overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
+        <table className="w-full data-table relative">
+          <thead className="sticky top-0 z-10 bg-white shadow-sm ring-1 ring-black/5">
+            <tr style={{ backgroundColor: '#FFFFFF', boxShadow: 'inset 0 -1px 0 #E5E5E3' }}>
             <th className="text-left px-4 py-3 text-gray-500 w-[300px]">Material</th>
             <th className="text-right px-4 py-3 text-gray-500 w-[120px]">Current Cost</th>
             <th className="text-right px-4 py-3 text-gray-500 w-[120px]">Staged Cost</th>
@@ -181,8 +182,9 @@ export function StagedChangesTable({ initialData }: StagedChangesTableProps) {
           })}
         </tbody>
       </table>
+      </div>
 
-      <div className="px-4 py-3 border-t border-[#E5E5E3] flex items-center justify-between">
+      <div className="flex-none px-4 py-3 border-t border-[#E5E5E3] flex items-center justify-between bg-white">
         <p className="text-[12px] text-gray-400">
           {changes.length} staged change{changes.length !== 1 ? 's' : ''} pending
         </p>
