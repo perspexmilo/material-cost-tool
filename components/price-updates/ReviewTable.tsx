@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
 import { Tag } from '@/components/ui/Tag'
@@ -73,6 +73,22 @@ export function ReviewTable({ parseResult, onCommitSuccess }: ReviewTableProps) 
     enabled: unresolvedRows.length > 0,
   })
 
+  const isLathams = parseResult.manufacturers.includes('James Latham')
+
+  // For Lathams: filter to Lathams supplier only, sorted by typeFinish then description
+  const dropdownMaterials = useMemo(() => {
+    if (!allMaterials) return []
+    const filtered = isLathams
+      ? allMaterials.filter((m) => m.supplier?.name?.toLowerCase().includes('latham'))
+      : allMaterials
+    return [...filtered].sort((a, b) => {
+      const typeA = (a.typeFinish ?? '').toLowerCase()
+      const typeB = (b.typeFinish ?? '').toLowerCase()
+      if (typeA !== typeB) return typeA.localeCompare(typeB)
+      return a.description.localeCompare(b.description)
+    })
+  }, [allMaterials, isLathams])
+
   const commitMutation = useMutation<BulkUpdateResponse, Error, UpdateChange[]>({
     mutationFn: async (changes) => {
       const res = await fetch('/api/materials/bulk-update', {
@@ -139,13 +155,15 @@ export function ReviewTable({ parseResult, onCommitSuccess }: ReviewTableProps) 
     const changes: UpdateChange[] = []
 
     // Selected resolved rows
+    const updateSource = isLathams ? 'import' : 'email-parse'
+
     for (const row of rows) {
       if (!row.selected) continue
       changes.push({
         materialId: row.materialId,
         proposedCost: row.proposedCost,
         effectiveDate: row.effectiveDate,
-        updateSource: 'email-parse',
+        updateSource,
         aliasRawText: row.aliasRawText,
       })
     }
@@ -171,7 +189,7 @@ export function ReviewTable({ parseResult, onCommitSuccess }: ReviewTableProps) 
         materialId: u.mappedMaterialId,
         proposedCost,
         effectiveDate: u.parsedRange.effectiveDate,
-        updateSource: 'email-parse',
+        updateSource,
         aliasRawText: u.parsedRange.name,
       })
     }
@@ -329,10 +347,11 @@ export function ReviewTable({ parseResult, onCommitSuccess }: ReviewTableProps) 
                     <p className="text-[13px] font-medium text-gray-900">{u.parsedRange.name}</p>
                     <p className="text-[11px] text-gray-400 mt-0.5 italic">&ldquo;{u.rawText}&rdquo;</p>
                     <p className="text-[12px] text-gray-500 mt-1">
-                      Change:{' '}
-                      {u.parsedRange.changeType === 'percentage'
-                        ? `${u.parsedRange.changeValue > 0 ? '+' : ''}${u.parsedRange.changeValue}%`
-                        : `${u.parsedRange.changeValue > 0 ? '+' : ''}£${Math.abs(u.parsedRange.changeValue).toFixed(2)}`}
+                      {u.parsedRange.absoluteNewPrice != null
+                        ? `New price: £${u.parsedRange.absoluteNewPrice.toFixed(2)}`
+                        : u.parsedRange.changeType === 'percentage'
+                        ? `Change: ${u.parsedRange.changeValue > 0 ? '+' : ''}${u.parsedRange.changeValue}%`
+                        : `Change: ${u.parsedRange.changeValue > 0 ? '+' : ''}£${Math.abs(u.parsedRange.changeValue).toFixed(2)}`}
                       {u.parsedRange.effectiveDate &&
                         ` · Effective ${format(parseISO(u.parsedRange.effectiveDate), 'dd MMM yyyy')}`}
                     </p>
@@ -351,9 +370,9 @@ export function ReviewTable({ parseResult, onCommitSuccess }: ReviewTableProps) 
                       }}
                     >
                       <option value="">— Select material —</option>
-                      {allMaterials?.map((m) => (
+                      {dropdownMaterials.map((m) => (
                         <option key={m.id} value={m.id}>
-                          {m.description} ({m.supplier?.name})
+                          {m.typeFinish ? `[${m.typeFinish}] ` : ''}{m.description}
                         </option>
                       ))}
                     </select>
