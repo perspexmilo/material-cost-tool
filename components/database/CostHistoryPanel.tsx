@@ -28,25 +28,14 @@ function PriceChart({ history }: { history: CostHistory[] }) {
   // history is DESC — reverse to chronological order
   const chronological = [...history].reverse()
 
-  // Build data points: start with the price before the first recorded change,
-  // then plot each newCost at its changedAt timestamp.
-  // The "before" point is placed 30 days before the first change so it renders
-  // as a horizontal line rather than collapsing to a vertical spike.
-  const firstChangedAt = new Date(chronological[0].changedAt).getTime()
-  const beforeDate = firstChangedAt - 30 * 24 * 60 * 60 * 1000
-
-  const points = [
-    {
-      date: beforeDate,
-      cost: chronological[0].previousCost,
-      label: 'Before changes',
-    },
-    ...chronological.map((e) => ({
-      date: new Date(e.changedAt).getTime(),
-      cost: e.newCost,
-      label: sourceLabel(e.updateSource),
-    })),
-  ]
+  // Plot only real data points — each entry's newCost at its changedAt date.
+  // previousCost is shown in the tooltip but not plotted as a fake anchor date.
+  const points = chronological.map((e) => ({
+    date: new Date(e.changedAt).getTime(),
+    cost: e.newCost,
+    previousCost: e.previousCost,
+    label: sourceLabel(e.updateSource),
+  }))
 
   const minCost = Math.min(...points.map((p) => p.cost))
   const maxCost = Math.max(...points.map((p) => p.cost))
@@ -91,6 +80,12 @@ function PriceChart({ history }: { history: CostHistory[] }) {
               return (
                 <div className="bg-white border border-[#E5E5E3] rounded-lg px-3 py-2 shadow-sm text-[12px]">
                   <p className="text-gray-400 mb-0.5">{format(new Date(date), 'dd MMM yyyy')}</p>
+                  {payload[0].payload.previousCost != null && (
+                    <p className="text-gray-400 text-[11px]">
+                      {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(payload[0].payload.previousCost)}
+                      {' → '}
+                    </p>
+                  )}
                   <p className="font-semibold text-gray-900">
                     {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(cost)}
                   </p>
