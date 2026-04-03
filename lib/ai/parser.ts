@@ -285,8 +285,10 @@ export async function parseEmail(emailBody: string): Promise<ParseResult> {
 
     const scored = candidateMaterials
       .map((m) => {
-        // Primary score: description + variantType combined
-        const searchTarget = [m.description, m.variantType].filter(Boolean).join(' ')
+        // Primary score: description + variantType + typeFinish combined
+        // typeFinish must be included so material nouns like "MDF" stored there
+        // don't cause a hard rejection when they appear in the extracted range name
+        const searchTarget = [m.description, m.variantType, m.typeFinish].filter(Boolean).join(' ')
         const combinedScore = fuzzyScore(range.name, searchTarget)
 
         // Bonus: if every meaningful word in variantType appears in the range name,
