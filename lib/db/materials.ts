@@ -215,3 +215,65 @@ export async function deleteMaterials(ids: string[]): Promise<{ deleted: number 
   const result = await prisma.material.deleteMany({ where: { id: { in: ids } } })
   return { deleted: result.count }
 }
+
+export async function updateMaterial(id: string, data: {
+  description?: string
+  variantType?: string | null
+  magentoSku?: string | null
+  thicknessMm?: number
+  widthMm?: number
+  heightMm?: number
+  supplierName?: string
+  costPerSheet?: number
+}): Promise<Material> {
+  const existing = await prisma.material.findUnique({ where: { id } })
+  if (!existing) throw new Error('Material not found')
+
+  let supplierId: string | undefined
+  if (data.supplierName !== undefined) {
+    const supplier = await prisma.supplier.upsert({
+      where: { name: data.supplierName },
+      update: {},
+      create: { name: data.supplierName },
+    })
+    supplierId = supplier.id
+  }
+
+  const updateData = {
+    ...(data.description !== undefined && { description: data.description }),
+    ...(data.variantType !== undefined && { variantType: data.variantType }),
+    ...(data.magentoSku !== undefined && { magentoSku: data.magentoSku }),
+    ...(data.thicknessMm !== undefined && { thicknessMm: data.thicknessMm }),
+    ...(data.widthMm !== undefined && { widthMm: data.widthMm }),
+    ...(data.heightMm !== undefined && { heightMm: data.heightMm }),
+    ...(supplierId !== undefined && { supplierId }),
+    ...(data.costPerSheet !== undefined && { costPerSheet: data.costPerSheet }),
+    updateSource: 'manual' as const,
+    lastUpdatedAt: new Date(),
+  }
+
+  const costChanged = data.costPerSheet !== undefined && data.costPerSheet !== existing.costPerSheet.toNumber()
+
+  if (costChanged) {
+    const [updated] = await prisma.$transaction([
+      prisma.material.update({ where: { id }, data: updateData, include: { supplier: true } }),
+      prisma.costHistory.create({
+        data: {
+          materialId: id,
+          previousCost: existing.costPerSheet,
+          newCost: data.costPerSheet!,
+          effectiveDate: new Date(),
+          updateSource: 'manual',
+        },
+      }),
+    ])
+    return serializeMaterial(updated)
+  }
+
+  const updated = await prisma.material.update({
+    where: { id },
+    data: updateData,
+    include: { supplier: true },
+  })
+  return serializeMaterial(updated)
+}

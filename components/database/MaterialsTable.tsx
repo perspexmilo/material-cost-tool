@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow, format } from 'date-fns'
-import { ChevronDown, ChevronRight, Trash2, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Trash2, ArrowUpDown, ArrowUp, ArrowDown, X, Pencil, Check } from 'lucide-react'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { CostHistoryPanel } from './CostHistoryPanel'
 import { ImportDialog } from './ImportDialog'
@@ -16,6 +16,17 @@ interface MaterialsTableProps {
 
 type SortColumn = 'variantType' | 'description' | 'thicknessMm' | 'costPerSheet' | 'supplier' | 'lastUpdatedAt'
 type SortDir = 'asc' | 'desc'
+
+interface EditValues {
+  description: string
+  variantType: string
+  magentoSku: string
+  thicknessMm: string
+  widthMm: string
+  heightMm: string
+  supplierName: string
+  costPerSheet: string
+}
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
@@ -124,6 +135,9 @@ export function MaterialsTable({ initialData, filters: externalFilters }: Materi
   const [expandedId, setExpandedId]     = useState<string | null>(null)
   const [selectedIds, setSelectedIds]   = useState<Set<string>>(new Set())
   const [deleteError, setDeleteError]   = useState<string | null>(null)
+  const [editingId, setEditingId]       = useState<string | null>(null)
+  const [editValues, setEditValues]     = useState<EditValues | null>(null)
+  const [editError, setEditError]       = useState<string | null>(null)
   const queryClient = useQueryClient()
 
   const queryFilters: MaterialFilters = {
@@ -212,82 +226,149 @@ export function MaterialsTable({ initialData, filters: externalFilters }: Materi
     deleteMutation.mutate(ids)
   }
 
+  function handleStartEdit() {
+    const id = Array.from(selectedIds)[0]
+    const material = materials.find((m) => m.id === id)
+    if (!material) return
+    setEditingId(id)
+    setEditError(null)
+    setEditValues({
+      description:  material.description,
+      variantType:  material.variantType ?? '',
+      magentoSku:   material.magentoSku ?? '',
+      thicknessMm:  String(material.thicknessMm),
+      widthMm:      String(material.widthMm),
+      heightMm:     String(material.heightMm),
+      supplierName: material.supplier?.name ?? '',
+      costPerSheet: String(material.costPerSheet),
+    })
+  }
+
+  function handleCancelEdit() {
+    setEditingId(null)
+    setEditValues(null)
+    setEditError(null)
+  }
+
+  function handleEditChange(field: keyof EditValues, value: string) {
+    setEditValues((prev) => prev ? { ...prev, [field]: value } : prev)
+  }
+
+  const editMutation = useMutation({
+    mutationFn: async ({ id, values }: { id: string; values: EditValues }) => {
+      const res = await fetch(`/api/materials/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description:  values.description,
+          variantType:  values.variantType || null,
+          magentoSku:   values.magentoSku || null,
+          thicknessMm:  parseFloat(values.thicknessMm),
+          widthMm:      parseFloat(values.widthMm),
+          heightMm:     parseFloat(values.heightMm),
+          supplierName: values.supplierName,
+          costPerSheet: parseFloat(values.costPerSheet),
+        }),
+      })
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error ?? 'Update failed') }
+      return res.json()
+    },
+    onSuccess: () => {
+      setEditingId(null)
+      setEditValues(null)
+      setEditError(null)
+      setSelectedIds(new Set())
+      void queryClient.invalidateQueries({ queryKey: ['materials'] })
+    },
+    onError: (err: Error) => setEditError(err.message),
+  })
+
   const totalCount = materials.length
 
   return (
     <div className="flex flex-col">
-      {/* Toolbar */}
-      <div className="sticky top-12 z-20 bg-[#F7F7F5] pt-1 pb-3">
-        <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <SearchInput placeholder="Search materials…" value={search} onChange={(e) => setSearch(e.target.value)} containerClassName="w-72" />
-          <span className="text-[12px] text-gray-400">{totalCount} material{totalCount !== 1 ? 's' : ''}</span>
+      {/* Toolbar + Filter bar — single sticky block so nothing shifts independently */}
+      <div className="sticky top-0 z-30 bg-[#F7F7F5] pt-4">
+        <div className="flex items-center justify-between pb-3">
+          <div className="flex items-center gap-3">
+            <SearchInput placeholder="Search materials…" value={search} onChange={(e) => setSearch(e.target.value)} containerClassName="w-72" />
+            <span className="text-[12px] text-gray-400">{totalCount} material{totalCount !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {selectedIds.size > 0 && (
+              <>
+                <span className="text-[12px] text-gray-500">{selectedIds.size} selected</span>
+                {selectedIds.size === 1 && !editingId && (
+                  <button
+                    type="button" onClick={handleStartEdit}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg bg-white border border-[#E5E5E3] text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Pencil size={13} /> Edit
+                  </button>
+                )}
+                <button
+                  type="button" onClick={handleDelete} disabled={deleteMutation.isPending || !!editingId}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+                >
+                  <Trash2 size={13} />
+                  {deleteMutation.isPending ? 'Deleting…' : `Delete ${selectedIds.size}`}
+                </button>
+              </>
+            )}
+            <ImportDialog onSuccess={handleImportSuccess} />
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          {selectedIds.size > 0 && (
-            <>
-              <span className="text-[12px] text-gray-500">{selectedIds.size} selected</span>
-              <button
-                type="button" onClick={handleDelete} disabled={deleteMutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
-              >
-                <Trash2 size={13} />
-                {deleteMutation.isPending ? 'Deleting…' : `Delete ${selectedIds.size}`}
-              </button>
-            </>
-          )}
-          <ImportDialog onSuccess={handleImportSuccess} />
-        </div>
-        </div>
-      </div>
 
-      {/* Filter bar */}
-      <div className="sticky top-[108px] z-20 bg-[#F7F7F5] pb-4 flex items-center gap-2">
-        <select
-          value={filterCategory}
-          onChange={(e) => { setFilterCategory(e.target.value); setFilterType('') }}
-          className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
-        >
-          <option value="">All categories</option>
-          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-
-        <select
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-          className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
-        >
-          <option value="">All types</option>
-          {typeFinishes.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-
-        <select
-          value={filterSupplier}
-          onChange={(e) => setFilterSupplier(e.target.value)}
-          className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
-        >
-          <option value="">All suppliers</option>
-          {suppliers.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-
-        {hasActiveFilters && (
-          <button
-            type="button" onClick={clearFilters}
-            className="flex items-center gap-1 text-[12px] text-gray-400 hover:text-gray-600 transition-colors"
+        <div className="pb-4 flex items-center gap-2">
+          <select
+            value={filterCategory}
+            onChange={(e) => { setFilterCategory(e.target.value); setFilterType('') }}
+            className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
           >
-            <X size={12} /> Clear filters
-          </button>
-        )}
+            <option value="">All categories</option>
+            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
+          >
+            <option value="">All types</option>
+            {typeFinishes.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+
+          <select
+            value={filterSupplier}
+            onChange={(e) => setFilterSupplier(e.target.value)}
+            className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
+          >
+            <option value="">All suppliers</option>
+            {suppliers.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+
+          {hasActiveFilters && (
+            <button
+              type="button" onClick={clearFilters}
+              className="flex items-center gap-1 text-[12px] text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X size={12} /> Clear filters
+            </button>
+          )}
+        </div>
       </div>
 
       {deleteError && (
         <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-[12px] text-red-600">{deleteError}</div>
       )}
+      {editError && (
+        <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-[12px] text-red-600">{editError}</div>
+      )}
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-[#E5E5E3] overflow-hidden">
-        <table className="w-full data-table relative border-collapse">
-          <thead className="sticky top-[156px] z-10 bg-white shadow-[0_1px_0_rgba(0,0,0,0.05)]">
+      <div className="relative z-0 bg-white rounded-xl border border-[#E5E5E3]">
+        <table className="w-full data-table relative border-separate border-spacing-0">
+          <thead className="sticky top-[112px] z-20 bg-white shadow-[0_1px_0_rgba(0,0,0,0.05)]">
             <tr style={{ backgroundColor: '#FFFFFF', boxShadow: 'inset 0 -1px 0 #E5E5E3' }}>
               <th className="px-4 py-3 w-10">
                 <IndeterminateCheckbox
@@ -322,6 +403,12 @@ export function MaterialsTable({ initialData, filters: externalFilters }: Materi
                 selectedIds={selectedIds}
                 onToggle={toggleRow}
                 onSelect={toggleSelect}
+                editingId={editingId}
+                editValues={editValues}
+                onEditChange={handleEditChange}
+                onSave={() => editingId && editValues && editMutation.mutate({ id: editingId, values: editValues })}
+                onCancelEdit={handleCancelEdit}
+                isSaving={editMutation.isPending}
               />
             ))}
           </tbody>
@@ -333,9 +420,12 @@ export function MaterialsTable({ initialData, filters: externalFilters }: Materi
 
 // ─── Group rows ───────────────────────────────────────────────────────────────
 
-function GroupRows({ group, expandedId, selectedIds, onToggle, onSelect }: {
+function GroupRows({ group, expandedId, selectedIds, onToggle, onSelect, editingId, editValues, onEditChange, onSave, onCancelEdit, isSaving }: {
   group: MaterialGroup; expandedId: string | null
   selectedIds: Set<string>; onToggle: (id: string) => void; onSelect: (id: string) => void
+  editingId: string | null; editValues: EditValues | null
+  onEditChange: (field: keyof EditValues, value: string) => void
+  onSave: () => void; onCancelEdit: () => void; isSaving: boolean
 }) {
   return (
     <>
@@ -349,54 +439,120 @@ function GroupRows({ group, expandedId, selectedIds, onToggle, onSelect }: {
       {group.materials.map((material) => {
         const isExpanded = expandedId === material.id
         const isSelected = selectedIds.has(material.id)
+        const isEditing  = editingId === material.id
         const lastUpdated = new Date(material.lastUpdatedAt)
+
+        const editInput = (field: keyof EditValues, opts?: { className?: string; type?: string }) => (
+          <input
+            type={opts?.type ?? 'text'}
+            value={editValues?.[field] ?? ''}
+            onChange={(e) => onEditChange(field, e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (e.key === 'Enter') onSave(); if (e.key === 'Escape') onCancelEdit() }}
+            className={`border-b border-[#2DBDAA] bg-transparent outline-none text-[13px] w-full px-0 ${opts?.className ?? ''}`}
+          />
+        )
 
         return (
           <React.Fragment key={material.id}>
-            <tr
-              onClick={() => onToggle(material.id)}
-              className="cursor-pointer border-b border-[#F0F0EE] transition-colors duration-100"
-              style={{ backgroundColor: isSelected ? '#F0FAF8' : isExpanded ? '#F0F0EE' : undefined }}
-              onMouseEnter={(e) => { if (!isExpanded && !isSelected) (e.currentTarget as HTMLTableRowElement).style.backgroundColor = '#F0F0EE' }}
-              onMouseLeave={(e) => { if (!isExpanded && !isSelected) (e.currentTarget as HTMLTableRowElement).style.backgroundColor = '' }}
-            >
-              <td className="px-4 py-3" onClick={(e) => { e.stopPropagation(); onSelect(material.id) }}>
-                <input type="checkbox" checked={isSelected} onChange={() => onSelect(material.id)} className="cursor-pointer accent-[#2DBDAA]" />
-              </td>
-              <td className="px-4 py-3 text-[13px] text-gray-900 font-medium">{material.description}</td>
-              <td className="px-4 py-3">
-                {material.variantType
-                  ? <span className="text-[12px] text-gray-600">{material.variantType}</span>
-                  : <span className="text-[12px] text-gray-300">—</span>}
-              </td>
-              <td className="px-4 py-3">
-                {material.magentoSku
-                  ? <span className="font-mono text-[12px] text-gray-400">{material.magentoSku}</span>
-                  : <span className="text-[12px] text-gray-300">—</span>}
-              </td>
-              <td className="px-4 py-3 text-[13px] text-gray-600">{material.thicknessMm}mm</td>
-              <td className="px-4 py-3 text-[13px] text-gray-600">{material.widthMm} × {material.heightMm}mm</td>
-              <td className="px-4 py-3 text-[13px] text-gray-600">{material.supplier?.name ?? '—'}</td>
-              <td className="px-4 py-3 text-right">
-                <span className="cost-cell tabular-nums text-gray-900">{formatCurrency(material.costPerSheet)}</span>
-              </td>
-              <td className="px-4 py-3 text-right">
-                <span className="cost-cell tabular-nums text-gray-500">{formatM2Cost(material.costPerM2)}</span>
-              </td>
-              <td className="px-4 py-3">
-                <time dateTime={material.lastUpdatedAt} title={format(lastUpdated, 'dd MMM yyyy HH:mm')} className="text-[13px] text-gray-500">
-                  {formatDistanceToNow(lastUpdated, { addSuffix: true })}
-                </time>
-              </td>
-              <td className="px-4 py-3">
-                <span className="text-[12px] text-gray-400">{sourceLabel(material.updateSource)}</span>
-              </td>
-              <td className="px-4 py-3 text-gray-400">
-                {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              </td>
-            </tr>
+            {isEditing ? (
+              <tr className="border-b border-[#F0F0EE]" style={{ backgroundColor: '#EFF9F7' }}>
+                <td className="px-4 py-2">
+                  <input type="checkbox" checked={isSelected} readOnly className="accent-[#2DBDAA]" />
+                </td>
+                <td className="px-4 py-2">{editInput('description')}</td>
+                <td className="px-4 py-2">{editInput('variantType')}</td>
+                <td className="px-4 py-2">{editInput('magentoSku')}</td>
+                <td className="px-4 py-2">{editInput('thicknessMm', { type: 'number' })}</td>
+                <td className="px-4 py-2">
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number" value={editValues?.widthMm ?? ''}
+                      onChange={(e) => onEditChange('widthMm', e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => { if (e.key === 'Enter') onSave(); if (e.key === 'Escape') onCancelEdit() }}
+                      className="border-b border-[#2DBDAA] bg-transparent outline-none text-[13px] w-[52px] px-0"
+                    />
+                    <span className="text-gray-400 text-[12px]">×</span>
+                    <input
+                      type="number" value={editValues?.heightMm ?? ''}
+                      onChange={(e) => onEditChange('heightMm', e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => { if (e.key === 'Enter') onSave(); if (e.key === 'Escape') onCancelEdit() }}
+                      className="border-b border-[#2DBDAA] bg-transparent outline-none text-[13px] w-[52px] px-0"
+                    />
+                  </div>
+                </td>
+                <td className="px-4 py-2">{editInput('supplierName')}</td>
+                <td className="px-4 py-2">{editInput('costPerSheet', { type: 'number' })}</td>
+                <td className="px-4 py-2 text-right text-[13px] text-gray-400">—</td>
+                <td className="px-4 py-2 text-[13px] text-gray-400">—</td>
+                <td className="px-4 py-2 text-[13px] text-gray-400">—</td>
+                <td className="px-4 py-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button" onClick={onSave} disabled={isSaving}
+                      className="text-[#2DBDAA] hover:text-[#249A8B] disabled:opacity-50 transition-colors"
+                      title="Save"
+                    >
+                      <Check size={15} />
+                    </button>
+                    <button
+                      type="button" onClick={onCancelEdit} disabled={isSaving}
+                      className="text-gray-400 hover:text-gray-600 disabled:opacity-50 transition-colors"
+                      title="Cancel"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              <tr
+                onClick={() => onToggle(material.id)}
+                className="cursor-pointer border-b border-[#F0F0EE] transition-colors duration-100"
+                style={{ backgroundColor: isSelected ? '#F0FAF8' : isExpanded ? '#F0F0EE' : undefined }}
+                onMouseEnter={(e) => { if (!isExpanded && !isSelected) (e.currentTarget as HTMLTableRowElement).style.backgroundColor = '#F0F0EE' }}
+                onMouseLeave={(e) => { if (!isExpanded && !isSelected) (e.currentTarget as HTMLTableRowElement).style.backgroundColor = '' }}
+              >
+                <td className="px-4 py-3" onClick={(e) => { e.stopPropagation(); onSelect(material.id) }}>
+                  <input type="checkbox" checked={isSelected} onChange={() => onSelect(material.id)} onClick={(e) => e.stopPropagation()} className="cursor-pointer accent-[#2DBDAA]" />
+                </td>
+                <td className="px-4 py-3 text-[13px] text-gray-900 font-medium">{material.description}</td>
+                <td className="px-4 py-3">
+                  {material.variantType
+                    ? <span className="text-[12px] text-gray-600">{material.variantType}</span>
+                    : <span className="text-[12px] text-gray-300">—</span>}
+                </td>
+                <td className="px-4 py-3">
+                  {material.magentoSku
+                    ? <span className="font-mono text-[12px] text-gray-400">{material.magentoSku}</span>
+                    : <span className="text-[12px] text-gray-300">—</span>}
+                </td>
+                <td className="px-4 py-3 text-[13px] text-gray-600">{material.thicknessMm}mm</td>
+                <td className="px-4 py-3 text-[13px] text-gray-600">{material.widthMm} × {material.heightMm}mm</td>
+                <td className="px-4 py-3 text-[13px] text-gray-600">{material.supplier?.name ?? '—'}</td>
+                <td className="px-4 py-3 text-right">
+                  <span className="cost-cell tabular-nums text-gray-900">{formatCurrency(material.costPerSheet)}</span>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <span className="cost-cell tabular-nums text-gray-500">{formatM2Cost(material.costPerM2)}</span>
+                </td>
+                <td className="px-4 py-3">
+                  <time dateTime={material.lastUpdatedAt} title={format(lastUpdated, 'dd MMM yyyy HH:mm')} className="text-[13px] text-gray-500">
+                    {formatDistanceToNow(lastUpdated, { addSuffix: true })}
+                  </time>
+                </td>
+                <td className="px-4 py-3">
+                  <span className="text-[12px] text-gray-400">{sourceLabel(material.updateSource)}</span>
+                </td>
+                <td className="px-4 py-3 text-gray-400">
+                  {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </td>
+              </tr>
+            )}
 
-            {isExpanded && (
+            {isExpanded && !isEditing && (
               <tr>
                 <td colSpan={12} className="p-0 border-b border-[#E5E5E3]">
                   <div className="slide-down">
