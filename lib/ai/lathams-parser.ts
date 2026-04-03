@@ -171,14 +171,16 @@ export async function parseLathamsQuote(pdfBase64: string): Promise<ParseResult>
   }
 
   const extracted = toolBlock.input as ExtractionResult
-  const validItems = extracted.items.filter((i) => !i.isPOA && i.pricePerBoard > 0)
+  console.log('[lathams-parser] extracted keys:', Object.keys(extracted ?? {}))
+  console.log('[lathams-parser] items count:', extracted?.items?.length ?? 'undefined')
+  const validItems = (extracted?.items ?? []).filter((i) => !i.isPOA && i.pricePerBoard > 0)
 
   if (validItems.length === 0) {
     return { resolved: [], unresolved: [], manufacturers: ['James Latham'], parseTimestamp: new Date().toISOString() }
   }
 
   // 2. Load all DB materials
-  const allMaterials = await getMaterials()
+  const allMaterials = (await getMaterials()) ?? []
 
   // 3. Try to find Lathams materials (supplier name contains "latham")
   const lathamsMaterials = allMaterials.filter((m) =>
