@@ -1,7 +1,11 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { formatDistanceToNow, format } from 'date-fns'
+import { format } from 'date-fns'
+import {
+  ResponsiveContainer, AreaChart, Area,
+  XAxis, YAxis, Tooltip, CartesianGrid,
+} from 'recharts'
 import type { CostHistory } from '@/types'
 
 interface CostHistoryPanelProps {
@@ -16,6 +20,93 @@ function formatCurrency(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value)
+}
+
+// ─── Price Chart ──────────────────────────────────────────────────────────────
+
+function PriceChart({ history }: { history: CostHistory[] }) {
+  // history is DESC — reverse to chronological order
+  const chronological = [...history].reverse()
+
+  // Build data points: start with the price before the first recorded change,
+  // then plot each newCost at its changedAt timestamp
+  const points = [
+    {
+      date: new Date(chronological[0].changedAt).getTime(),
+      cost: chronological[0].previousCost,
+      label: 'Before changes',
+    },
+    ...chronological.map((e) => ({
+      date: new Date(e.changedAt).getTime(),
+      cost: e.newCost,
+      label: sourceLabel(e.updateSource),
+    })),
+  ]
+
+  const minCost = Math.min(...points.map((p) => p.cost))
+  const maxCost = Math.max(...points.map((p) => p.cost))
+  const pad = (maxCost - minCost) * 0.15 || maxCost * 0.1
+
+  return (
+    <div className="mb-6 -mx-6 px-6 pt-2 pb-5 border-b border-[#E5E5E3]">
+      <ResponsiveContainer width="100%" height={160}>
+        <AreaChart data={points} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id="costGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%"  stopColor="#2DBDAA" stopOpacity={0.15} />
+              <stop offset="95%" stopColor="#2DBDAA" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid vertical={false} stroke="#F0F0EE" />
+          <XAxis
+            dataKey="date"
+            type="number"
+            scale="time"
+            domain={['dataMin', 'dataMax']}
+            tickFormatter={(v) => format(new Date(v), 'd MMM yy')}
+            tick={{ fontSize: 10, fill: '#9CA3AF' }}
+            tickLine={false}
+            axisLine={false}
+            minTickGap={40}
+          />
+          <YAxis
+            domain={[minCost - pad, maxCost + pad]}
+            tickFormatter={(v) =>
+              new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(v)
+            }
+            tick={{ fontSize: 10, fill: '#9CA3AF' }}
+            tickLine={false}
+            axisLine={false}
+            width={64}
+          />
+          <Tooltip
+            content={({ active, payload }) => {
+              if (!active || !payload?.length) return null
+              const { date, cost, label } = payload[0].payload as typeof points[0]
+              return (
+                <div className="bg-white border border-[#E5E5E3] rounded-lg px-3 py-2 shadow-sm text-[12px]">
+                  <p className="text-gray-400 mb-0.5">{format(new Date(date), 'dd MMM yyyy')}</p>
+                  <p className="font-semibold text-gray-900">
+                    {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(cost)}
+                  </p>
+                  <p className="text-gray-400">{label}</p>
+                </div>
+              )
+            }}
+          />
+          <Area
+            type="monotone"
+            dataKey="cost"
+            stroke="#2DBDAA"
+            strokeWidth={2}
+            fill="url(#costGradient)"
+            dot={{ r: 3, fill: '#2DBDAA', strokeWidth: 0 }}
+            activeDot={{ r: 4, fill: '#2DBDAA', strokeWidth: 0 }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  )
 }
 
 function sourceLabel(source: string): string {
@@ -68,6 +159,10 @@ export function CostHistoryPanel({ materialId, materialDescription }: CostHistor
 
       {data && data.length === 0 && (
         <p className="text-sm text-gray-400 py-4">No cost history recorded yet.</p>
+      )}
+
+      {data && data.length > 0 && (
+        <PriceChart history={data} />
       )}
 
       {data && data.length > 0 && (
