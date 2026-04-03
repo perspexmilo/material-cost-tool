@@ -289,7 +289,11 @@ export async function parseEmail(emailBody: string): Promise<ParseResult> {
         // typeFinish must be included so material nouns like "MDF" stored there
         // don't cause a hard rejection when they appear in the extracted range name
         const searchTarget = [m.description, m.variantType, m.typeFinish].filter(Boolean).join(' ')
-        const combinedScore = fuzzyScore(range.name, searchTarget)
+        // Score against both extracted name AND raw email text — Claude sometimes
+        // hallucinates a product name, but rawText contains the original wording
+        const nameScore = fuzzyScore(range.name, searchTarget)
+        const rawScore = fuzzyScore(range.rawText, searchTarget)
+        const combinedScore = Math.max(nameScore, rawScore)
 
         // Bonus: if every meaningful word in variantType appears in the range name
         // AND the range name is not much more specific than the variantType itself,
