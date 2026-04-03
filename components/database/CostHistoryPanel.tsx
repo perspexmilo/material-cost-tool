@@ -29,10 +29,15 @@ function PriceChart({ history }: { history: CostHistory[] }) {
   const chronological = [...history].reverse()
 
   // Build data points: start with the price before the first recorded change,
-  // then plot each newCost at its changedAt timestamp
+  // then plot each newCost at its changedAt timestamp.
+  // The "before" point is placed 30 days before the first change so it renders
+  // as a horizontal line rather than collapsing to a vertical spike.
+  const firstChangedAt = new Date(chronological[0].changedAt).getTime()
+  const beforeDate = firstChangedAt - 30 * 24 * 60 * 60 * 1000
+
   const points = [
     {
-      date: new Date(chronological[0].changedAt).getTime(),
+      date: beforeDate,
       cost: chronological[0].previousCost,
       label: 'Before changes',
     },
