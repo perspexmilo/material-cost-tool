@@ -6,9 +6,10 @@ import { RefreshCw, AlertCircle, CheckCircle, Upload, FileText } from 'lucide-re
 import { Button } from '@/components/ui/Button'
 import { ReviewTable } from './ReviewTable'
 import { ContextPanel } from './ContextPanel'
-import type { ParseResult, BulkUpdateResponse } from '@/types'
+import { PerspexReviewPanel } from './PerspexReviewPanel'
+import type { ParseResult, BulkUpdateResponse, PerspexParseResult } from '@/types'
 
-type LeftTab = 'email' | 'lathams' | 'context'
+type LeftTab = 'email' | 'lathams' | 'perspex' | 'context'
 
 export function PriceUpdateTool() {
   const [activeTab, setActiveTab] = useState<LeftTab>('email')
@@ -16,8 +17,12 @@ export function PriceUpdateTool() {
   const [parseResult, setParseResult] = useState<ParseResult | null>(null)
   const [commitResult, setCommitResult] = useState<BulkUpdateResponse | null>(null)
   const [lathamsFile, setLathamsFile] = useState<File | null>(null)
+  const [perspexFile, setPerspexFile] = useState<File | null>(null)
+  const [perspexResult, setPerspexResult] = useState<PerspexParseResult | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [isPerspexDragging, setIsPerspexDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const perspexFileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
 
   const parseMutation = useMutation<ParseResult, Error, string>({
@@ -56,6 +61,23 @@ export function PriceUpdateTool() {
     },
   })
 
+  const perspexMutation = useMutation<PerspexParseResult, Error, File>({
+    mutationFn: async (file) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/parse-pdf-perspex', { method: 'POST', body: formData })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error ?? 'Parse failed')
+      }
+      return res.json()
+    },
+    onSuccess: (result) => {
+      setPerspexResult(result)
+      setCommitResult(null)
+    },
+  })
+
   function handleParse() {
     if (!emailBody.trim()) return
     setParseResult(null)
@@ -83,9 +105,16 @@ export function PriceUpdateTool() {
     if (file?.type === 'application/pdf') setLathamsFile(file)
   }
 
+  function handlePerspexDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setIsPerspexDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file?.type === 'application/pdf') setPerspexFile(file)
+  }
+
   const hasContent = emailBody.trim().length > 0
-  const isPending = parseMutation.isPending || lathamsMutation.isPending
-  const parseError = parseMutation.error ?? lathamsMutation.error
+  const isPending = parseMutation.isPending || lathamsMutation.isPending || perspexMutation.isPending
+  const parseError = parseMutation.error ?? lathamsMutation.error ?? perspexMutation.error
 
   return (
     <div className="flex gap-6 h-full overflow-hidden">
@@ -97,6 +126,7 @@ export function PriceUpdateTool() {
             {([
               { id: 'email', label: 'Email' },
               { id: 'lathams', label: 'Lathams PDF' },
+              { id: 'perspex', label: 'Perspex PDF' },
               { id: 'context', label: 'Context' },
             ] as { id: LeftTab; label: string }[]).map((tab) => (
               <button
@@ -229,6 +259,79 @@ export function PriceUpdateTool() {
                   </div>
                 </div>
               </div>
+            ) : activeTab === 'perspex' ? (
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="block text-[12px] font-semibold uppercase tracking-wider text-gray-500 mb-2">
+                    Upload Perspex Rate Card PDF
+                  </label>
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setIsPerspexDragging(true) }}
+                    onDragLeave={() => setIsPerspexDragging(false)}
+                    onDrop={handlePerspexDrop}
+                    onClick={() => perspexFileInputRef.current?.click()}
+                    className={`flex flex-col items-center justify-center gap-2 h-36 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
+                      isPerspexDragging
+                        ? 'border-[#2DBDAA] bg-[#E6F4F1]'
+                        : perspexFile
+                        ? 'border-[#2DBDAA]/40 bg-[#F0FAF8]'
+                        : 'border-[#E5E5E3] bg-[#F7F7F5] hover:border-[#2DBDAA]/40 hover:bg-[#F0FAF8]'
+                    }`}
+                  >
+                    {perspexFile ? (
+                      <>
+                        <FileText size={24} className="text-[#2DBDAA]" />
+                        <p className="text-[13px] font-medium text-gray-700">{perspexFile.name}</p>
+                        <p className="text-[11px] text-gray-400">
+                          {(perspexFile.size / 1024).toFixed(0)} KB — click to replace
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={24} className="text-gray-400" />
+                        <p className="text-[13px] text-gray-500">Drop PDF here or click to browse</p>
+                        <p className="text-[11px] text-gray-400">Perspex Distribution rate cards only</p>
+                      </>
+                    )}
+                  </div>
+                  <input
+                    ref={perspexFileInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) setPerspexFile(file)
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] text-gray-400">
+                    {perspexFile ? 'Ready to parse' : 'No file selected'}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {perspexFile && (
+                      <button
+                        type="button"
+                        onClick={() => { setPerspexFile(null); setPerspexResult(null); setCommitResult(null) }}
+                        className="text-[12px] text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <Button
+                      variant="primary"
+                      size="md"
+                      disabled={!perspexFile || perspexMutation.isPending}
+                      loading={perspexMutation.isPending}
+                      onClick={() => { if (perspexFile) { setPerspexResult(null); setCommitResult(null); perspexMutation.mutate(perspexFile) } }}
+                    >
+                      <RefreshCw size={14} />
+                      Parse PDF
+                    </Button>
+                  </div>
+                </div>
+              </div>
             ) : (
               <ContextPanel />
             )}
@@ -245,7 +348,7 @@ export function PriceUpdateTool() {
               </svg>
               <div>
                 <p className="text-[13px] font-medium text-gray-700">
-                  {lathamsMutation.isPending ? 'Parsing Lathams PDF with Claude…' : 'Parsing email with Claude…'}
+                  {lathamsMutation.isPending ? 'Parsing Lathams PDF with Claude…' : perspexMutation.isPending ? 'Parsing Perspex rate card with Claude…' : 'Parsing email with Claude…'}
                 </p>
                 <p className="text-[12px] text-gray-400">This usually takes 10–30 seconds</p>
               </div>
@@ -325,7 +428,7 @@ export function PriceUpdateTool() {
 
       {/* Right panel — 62% */}
       <div className="flex-1 min-w-0 flex flex-col h-full">
-        {!parseResult && !isPending && (
+        {!parseResult && !perspexResult && !isPending && (
           <div className="flex items-center justify-center h-full min-h-64">
             <div className="text-center">
               <div
@@ -336,7 +439,7 @@ export function PriceUpdateTool() {
               </div>
               <p className="text-[13px] font-medium text-gray-500">Nothing parsed yet</p>
               <p className="text-[12px] text-gray-400 mt-1">
-                Paste an email or upload a Lathams PDF on the left
+                Paste an email or upload a PDF on the left
               </p>
             </div>
           </div>
@@ -350,7 +453,7 @@ export function PriceUpdateTool() {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
               <p className="text-[13px] text-gray-500">
-                {lathamsMutation.isPending ? 'Claude is reading the PDF…' : 'Claude is reading the email…'}
+                {lathamsMutation.isPending ? 'Claude is reading the Lathams PDF…' : perspexMutation.isPending ? 'Claude is reading the Perspex rate card…' : 'Claude is reading the email…'}
               </p>
             </div>
           </div>
@@ -370,6 +473,26 @@ export function PriceUpdateTool() {
             ) : (
               <ReviewTable
                 parseResult={parseResult}
+                onCommitSuccess={handleCommitSuccess}
+              />
+            )}
+          </div>
+        )}
+
+        {perspexResult && !perspexMutation.isPending && (
+          <div className="fade-in flex flex-col flex-1 min-h-0">
+            {perspexResult.productGroups.length === 0 ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <p className="text-[13px] font-medium text-gray-500">No price data found</p>
+                  <p className="text-[12px] text-gray-400 mt-1">
+                    Check the PDF is a Perspex Distribution rate card.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <PerspexReviewPanel
+                result={perspexResult}
                 onCommitSuccess={handleCommitSuccess}
               />
             )}

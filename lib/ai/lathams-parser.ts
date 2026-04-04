@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getMaterials } from '@/lib/db/materials'
+import { getParserContextHints } from '@/lib/db/parser-context'
 import type { ParseResult, ResolvedChange, UnresolvedItem, ParsedRange, ConfidenceLevel } from '@/types'
 
 function getClient() {
@@ -137,11 +138,19 @@ function colourMatchScore(colourName: string, materialDescription: string, varia
 export async function parseLathamsQuote(pdfBase64: string): Promise<ParseResult> {
   const client = getClient()
 
-  // 1. Extract line items from PDF via Claude
+  // 1. Inject any user-defined context hints into the system prompt
+  const contextHints = await getParserContextHints()
+  const systemPrompt =
+    SYSTEM_PROMPT +
+    (contextHints.length > 0
+      ? `\n\nADDITIONAL CONTEXT FROM CutMy TEAM:\n${contextHints.map((h, i) => `${i + 1}. ${h}`).join('\n')}`
+      : '')
+
+  // 2. Extract line items from PDF via Claude
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 16000,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     tools: [extractionTool],
     tool_choice: { type: 'any' },
     messages: [

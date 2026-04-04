@@ -138,6 +138,32 @@ export interface ParseResult {
   parseTimestamp: string
 }
 
+// ─── Perspex PDF Parser ───────────────────────────────────────────────────────
+
+export interface PerspexEntry {
+  thicknessMm: number
+  pricePerSheet: number   // for the standard 3050×2030 sheet
+  pricePerM2: number | null
+  sheetSize: string       // e.g. "3050x2030"
+  /** DB materials that will be updated by this entry */
+  matchedMaterials: Array<{ id: string; description: string; currentCost: number }>
+}
+
+export interface PerspexProductGroup {
+  groupName: string       // e.g. "Cast Sheet Standard Gloss"
+  subType: string         // e.g. "CLEAR", "COLOUR"
+  dbVariantType: string | null  // resolved DB variantType, null if no mapping found
+  isColourCategory: boolean     // true → bulk-update ALL colour variants per thickness
+  entries: PerspexEntry[]
+}
+
+export interface PerspexParseResult {
+  productGroups: PerspexProductGroup[]
+  effectiveDate: string | null
+  quoteDate: string | null
+  parseTimestamp: string
+}
+
 // ─── API Response Shapes ──────────────────────────────────────────────────────
 
 export interface ApiError {
