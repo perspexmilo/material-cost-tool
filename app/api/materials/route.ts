@@ -17,9 +17,18 @@ export async function GET(request: NextRequest) {
     if (supplierId) filters.supplierId = supplierId
     if (search) filters.search = search
 
-    const materials = await getMaterials(filters)
+    const limitParam = searchParams.get('limit')
+    const offsetParam = searchParams.get('offset')
+    const pagination = (limitParam !== null || offsetParam !== null)
+      ? {
+          limit: limitParam !== null ? parseInt(limitParam, 10) : undefined,
+          offset: offsetParam !== null ? parseInt(offsetParam, 10) : undefined,
+        }
+      : undefined
 
-    return NextResponse.json({ materials, total: materials.length })
+    const { materials, total } = await getMaterials(filters, pagination)
+
+    return NextResponse.json({ materials, total })
   } catch (error) {
     console.error('[GET /api/materials]', error)
     return NextResponse.json(

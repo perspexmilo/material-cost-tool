@@ -67,7 +67,10 @@ function serializeMaterial(m: {
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export async function getMaterials(filters?: MaterialFilters): Promise<Material[]> {
+export async function getMaterials(
+  filters?: MaterialFilters,
+  pagination?: { limit?: number; offset?: number },
+): Promise<{ materials: Material[]; total: number }> {
   const where: {
     category?: string
     typeFinish?: string
@@ -84,17 +87,42 @@ export async function getMaterials(filters?: MaterialFilters): Promise<Material[
     ]
   }
 
-  const materials = await prisma.material.findMany({
-    where,
-    include: {
-      supplier: true,
-      costHistory: { orderBy: { changedAt: 'desc' }, take: 1, select: { changedAt: true } },
-      _count: { select: { stagedChanges: true } },
-    },
-    orderBy: [{ category: 'asc' }, { typeFinish: 'asc' }, { thicknessMm: 'asc' }],
-  })
+  const [total, rows] = await Promise.all([
+    prisma.material.count({ where }),
+    prisma.material.findMany({
+      where,
+      include: {
+        supplier: true,
+        costHistory: { orderBy: { changedAt: 'desc' }, take: 1, select: { changedAt: true } },
+        _count: { select: { stagedChanges: true } },
+      },
+      orderBy: [{ category: 'asc' }, { typeFinish: 'asc' }, { thicknessMm: 'asc' }],
+      ...(pagination?.limit !== undefined ? { take: pagination.limit } : {}),
+      ...(pagination?.offset !== undefined ? { skip: pagination.offset } : {}),
+    }),
+  ])
 
-  return materials.map(serializeMaterial)
+  return { materials: rows.map(serializeMaterial), total }
+}
+
+export async function getMaterialFilterOptions() {
+  const [categories, typeFinishes, suppliers, variantTypes] = await Promise.all([
+    prisma.material.findMany({ select: { category: true }, distinct: ['category'], orderBy: { category: 'asc' } }),
+    prisma.material.findMany({ select: { typeFinish: true }, distinct: ['typeFinish'], orderBy: { typeFinish: 'asc' } }),
+    prisma.supplier.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    prisma.material.findMany({
+      select: { variantType: true },
+      distinct: ['variantType'],
+      where: { variantType: { not: null } },
+      orderBy: { variantType: 'asc' },
+    }),
+  ])
+  return {
+    categories: categories.map((c) => c.category),
+    typeFinishes: typeFinishes.map((t) => t.typeFinish),
+    suppliers,
+    variantTypes: variantTypes.map((v) => v.variantType as string),
+  }
 }
 
 export async function getMaterialById(id: string): Promise<Material | null> {

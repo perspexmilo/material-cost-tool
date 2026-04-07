@@ -197,7 +197,7 @@ export async function parseLathamsQuote(pdfBase64: string): Promise<ParseResult>
   }
 
   // 2. Load all DB materials
-  const allMaterials = (await getMaterials()) ?? []
+  const { materials: allMaterials } = await getMaterials()
 
   // 3. Try to find Lathams materials (supplier name contains "latham")
   const lathamsMaterials = allMaterials.filter((m) =>

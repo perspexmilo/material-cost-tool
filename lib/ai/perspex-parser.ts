@@ -225,7 +225,7 @@ export async function parsePerspexPriceList(pdfBase64: string): Promise<PerspexP
   console.log('[perspex-parser] groups extracted:', extracted?.productGroups?.length ?? 0)
 
   // Load all DB materials
-  const allMaterials = await getMaterials()
+  const { materials: allMaterials } = await getMaterials()
   const perspexMaterials = allMaterials.filter((m) =>
     m.supplier?.name?.toLowerCase().includes('perspex')
   )

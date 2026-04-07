@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow, format } from 'date-fns'
 import { ChevronDown, ChevronRight, Trash2, ArrowUpDown, ArrowUp, ArrowDown, X, Pencil, Check } from 'lucide-react'
 import { SearchInput } from '@/components/ui/SearchInput'
@@ -10,8 +10,18 @@ import { ImportDialog } from './ImportDialog'
 import { AddVariantDialog } from './AddVariantDialog'
 import type { Material, MaterialFilters, MaterialGroup } from '@/types'
 
+const PAGE_SIZE = 100
+
+interface FilterOptions {
+  categories: string[]
+  typeFinishes: string[]
+  suppliers: { id: string; name: string }[]
+  variantTypes: string[]
+}
+
 interface MaterialsTableProps {
   initialData: Material[]
+  initialTotal: number
   filters?: MaterialFilters
 }
 
@@ -126,11 +136,11 @@ function SortTh({ col, label, activeCol, dir, onSort, className }: {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function MaterialsTable({ initialData, filters: externalFilters }: MaterialsTableProps) {
+export function MaterialsTable({ initialData, initialTotal, filters: externalFilters }: MaterialsTableProps) {
   const [search, setSearch]             = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [filterType, setFilterType]     = useState('')
-  const [filterSupplier, setFilterSupplier] = useState('')
+  const [filterSupplierId, setFilterSupplierId] = useState('')
   const [sortCol, setSortCol]           = useState<SortColumn>('variantType')
   const [sortDir, setSortDir]           = useState<SortDir>('asc')
   const [expandedId, setExpandedId]     = useState<string | null>(null)
@@ -141,50 +151,81 @@ export function MaterialsTable({ initialData, filters: externalFilters }: Materi
   const [editError, setEditError]       = useState<string | null>(null)
   const queryClient = useQueryClient()
 
-  const queryFilters: MaterialFilters = {
-    ...externalFilters,
+  const queryFilters = {
     search: search || undefined,
+    category: filterCategory || undefined,
+    typeFinish: filterType || undefined,
+    supplierId: filterSupplierId || undefined,
+    ...externalFilters,
   }
 
-  const { data: allMaterials, refetch } = useQuery<Material[]>({
+  const {
+    data: pagedData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+  } = useInfiniteQuery({
     queryKey: ['materials', queryFilters],
-    queryFn: async () => {
+    queryFn: async ({ pageParam }: { pageParam: number }) => {
       const params = new URLSearchParams()
       if (queryFilters.search) params.set('search', queryFilters.search)
+      if (queryFilters.category) params.set('category', queryFilters.category)
+      if (queryFilters.typeFinish) params.set('typeFinish', queryFilters.typeFinish)
+      if (queryFilters.supplierId) params.set('supplierId', queryFilters.supplierId)
+      params.set('limit', String(PAGE_SIZE))
+      params.set('offset', String(pageParam))
       const res = await fetch(`/api/materials?${params.toString()}`)
       if (!res.ok) throw new Error('Failed to fetch materials')
-      const json = await res.json()
-      return json.materials
+      return res.json() as Promise<{ materials: Material[]; total: number }>
     },
-    initialData: search ? undefined : initialData,
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, p) => sum + p.materials.length, 0)
+      return loaded < lastPage.total ? loaded : undefined
+    },
+    initialData: {
+      pages: [{ materials: initialData, total: initialTotal }],
+      pageParams: [0],
+    },
     staleTime: 30 * 1000,
   })
 
-  // Derive filter options from full dataset
-  const categories = useMemo(() =>
-    [...new Set((allMaterials ?? []).map((m) => m.category))].sort(), [allMaterials])
-  const typeFinishes = useMemo(() =>
-    [...new Set((allMaterials ?? []).filter((m) => !filterCategory || m.category === filterCategory).map((m) => m.typeFinish))].sort(),
-    [allMaterials, filterCategory])
-  const suppliers = useMemo(() =>
-    [...new Set((allMaterials ?? []).map((m) => m.supplier?.name).filter(Boolean) as string[])].sort(), [allMaterials])
-  const thicknesses = useMemo(() =>
-    [...new Set((allMaterials ?? []).map((m) => String(m.thicknessMm)))].sort((a, b) => parseFloat(a) - parseFloat(b)), [allMaterials])
-  const variantTypes = useMemo(() =>
-    [...new Set((allMaterials ?? []).map((m) => m.variantType).filter(Boolean) as string[])].sort(), [allMaterials])
+  const allMaterials = pagedData?.pages.flatMap((p) => p.materials) ?? initialData
+  const total = pagedData?.pages[0]?.total ?? initialTotal
 
-  // Apply client-side filters then sort
-  const materials = useMemo(() => {
-    let list = allMaterials ?? []
-    if (filterCategory) list = list.filter((m) => m.category === filterCategory)
-    if (filterType)     list = list.filter((m) => m.typeFinish === filterType)
-    if (filterSupplier) list = list.filter((m) => m.supplier?.name === filterSupplier)
-    return sortMaterials(list, sortCol, sortDir)
-  }, [allMaterials, filterCategory, filterType, filterSupplier, sortCol, sortDir])
+  // Fetch filter dropdown options from lightweight endpoint
+  const { data: filterOptions } = useQuery<FilterOptions>({
+    queryKey: ['material-filters'],
+    queryFn: async () => {
+      const res = await fetch('/api/materials/filters')
+      if (!res.ok) throw new Error('Failed to fetch filter options')
+      return res.json()
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const categories  = filterOptions?.categories ?? [...new Set(allMaterials.map((m) => m.category))].sort()
+  const typeFinishes = useMemo(() => {
+    const base = filterOptions?.typeFinishes ?? [...new Set(allMaterials.map((m) => m.typeFinish))].sort()
+    return filterCategory
+      ? base.filter((t) => allMaterials.some((m) => m.category === filterCategory && m.typeFinish === t))
+      : base
+  }, [filterOptions, allMaterials, filterCategory])
+  const supplierOptions = filterOptions?.suppliers ?? []
+  const thicknesses = useMemo(() =>
+    [...new Set(allMaterials.map((m) => String(m.thicknessMm)))].sort((a, b) => parseFloat(a) - parseFloat(b)),
+    [allMaterials])
+  const variantTypes = useMemo(() =>
+    filterOptions?.variantTypes ?? [...new Set(allMaterials.map((m) => m.variantType).filter(Boolean) as string[])].sort(),
+    [filterOptions, allMaterials])
+
+  // Sort loaded materials (filtering is server-side)
+  const materials = useMemo(() => sortMaterials(allMaterials, sortCol, sortDir), [allMaterials, sortCol, sortDir])
 
   const groups = useMemo(() => groupMaterials(materials), [materials])
 
-  const hasActiveFilters = !!(filterCategory || filterType || filterSupplier)
+  const hasActiveFilters = !!(filterCategory || filterType || filterSupplierId)
 
   function handleSort(col: SortColumn) {
     if (col === sortCol) setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
@@ -194,7 +235,7 @@ export function MaterialsTable({ initialData, filters: externalFilters }: Materi
   function clearFilters() {
     setFilterCategory('')
     setFilterType('')
-    setFilterSupplier('')
+    setFilterSupplierId('')
   }
 
   // Selection
@@ -208,6 +249,7 @@ export function MaterialsTable({ initialData, filters: externalFilters }: Materi
 
   const handleImportSuccess = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['materials'] })
+    void queryClient.invalidateQueries({ queryKey: ['material-filters'] })
     void refetch()
   }, [queryClient, refetch])
 
@@ -288,8 +330,6 @@ export function MaterialsTable({ initialData, filters: externalFilters }: Materi
     onError: (err: Error) => setEditError(err.message),
   })
 
-  const totalCount = materials.length
-
   return (
     <div className="flex flex-col">
       {/* Toolbar + Filter bar — single sticky block so nothing shifts independently */}
@@ -297,7 +337,7 @@ export function MaterialsTable({ initialData, filters: externalFilters }: Materi
         <div className="flex items-center justify-between pb-3">
           <div className="flex items-center gap-3">
             <SearchInput placeholder="Search materials…" value={search} onChange={(e) => setSearch(e.target.value)} containerClassName="w-72" />
-            <span className="text-[12px] text-gray-400">{totalCount} material{totalCount !== 1 ? 's' : ''}</span>
+            <span className="text-[12px] text-gray-400">{materials.length} of {total} material{total !== 1 ? 's' : ''}</span>
           </div>
           <div className="flex items-center gap-3">
             {selectedIds.size > 0 && (
@@ -325,7 +365,7 @@ export function MaterialsTable({ initialData, filters: externalFilters }: Materi
             typeFinishes={typeFinishes}
             variantTypes={variantTypes}
             thicknesses={thicknesses}
-            suppliers={suppliers}
+            suppliers={supplierOptions.map((s) => s.name)}
             onSuccess={handleImportSuccess}
           />
           <ImportDialog onSuccess={handleImportSuccess} />
@@ -352,12 +392,12 @@ export function MaterialsTable({ initialData, filters: externalFilters }: Materi
           </select>
 
           <select
-            value={filterSupplier}
-            onChange={(e) => setFilterSupplier(e.target.value)}
+            value={filterSupplierId}
+            onChange={(e) => setFilterSupplierId(e.target.value)}
             className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
           >
             <option value="">All suppliers</option>
-            {suppliers.map((s) => <option key={s} value={s}>{s}</option>)}
+            {supplierOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
 
           {hasActiveFilters && (
@@ -428,6 +468,19 @@ export function MaterialsTable({ initialData, filters: externalFilters }: Materi
           </tbody>
         </table>
       </div>
+
+      {hasNextPage && (
+        <div className="flex justify-center pt-4">
+          <button
+            type="button"
+            onClick={() => void fetchNextPage()}
+            disabled={isFetchingNextPage}
+            className="px-5 py-2 text-[13px] font-medium rounded-lg bg-white border border-[#E5E5E3] text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          >
+            {isFetchingNextPage ? 'Loading…' : `Load more (${total - materials.length} remaining)`}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

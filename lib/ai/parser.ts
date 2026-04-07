@@ -232,7 +232,7 @@ export async function parseEmail(emailBody: string): Promise<ParseResult> {
   console.log('[parser] extracted ranges:', JSON.stringify(extracted.ranges?.map(r => ({ name: r.name, rawText: r.rawText })), null, 2))
 
   // 4. Load all materials and known aliases
-  const [allMaterials, aliasMap] = await Promise.all([
+  const [{ materials: allMaterials }, aliasMap] = await Promise.all([
     getMaterials(),
     resolveAliases(extracted.ranges.map((r) => r.name)),
   ])
