@@ -15,6 +15,9 @@ const WOOD_COMPETITORS = [
   'mdf-direct',
   'wood-sheets',
   'cnc-creations',
+  'plastic-people-mdf',
+  'cut-plastic-sheeting-mdf',
+  'just-mdf',
 ] as const
 
 const COMPETITOR_LABELS: Record<string, string> = {
@@ -27,6 +30,9 @@ const COMPETITOR_LABELS: Record<string, string> = {
   'mdf-direct':           'MDF Direct',
   'wood-sheets':          'Wood Sheets',
   'cnc-creations':        'CNC Creations',
+  'plastic-people-mdf':         'Plastic People',
+  'cut-plastic-sheeting-mdf':   'Cut Plastic Sheeting',
+  'just-mdf':                   'Just MDF',
 }
 
 export async function GET(req: NextRequest) {

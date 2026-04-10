@@ -63,7 +63,7 @@ function Delta({ current, previous }: { current: number | null; previous: number
   const Icon = up ? TrendingUp : TrendingDown
 
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${colour} ml-1.5`}>
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${colour} mt-0.5`}>
       <Icon size={10} />
       {up ? '+' : ''}£{Math.abs(diff).toFixed(2)}
       <span className="opacity-70">({up ? '+' : ''}{pct.toFixed(1)}%)</span>
@@ -95,8 +95,10 @@ function PriceCell({
         pricier ? 'text-green-700' : '',
       ].filter(Boolean).join(' ')}
     >
-      <span className="font-mono">{fmt(price)}</span>
-      {!isCutMy && <Delta current={price} previous={previous} />}
+      <div className="flex flex-col items-end">
+        <span className="font-mono">{fmt(price)}</span>
+        {!isCutMy && <Delta current={price} previous={previous} />}
+      </div>
     </td>
   )
 }
@@ -281,7 +283,7 @@ export function CompetitorPricesView({ category }: Props) {
                   Avg
                 </th>
                 {data.competitors.map(c => (
-                  <th key={c.slug} className="px-4 py-3 text-right font-semibold text-gray-600 text-xs uppercase tracking-wider">
+                  <th key={c.slug} className="px-4 py-3 text-right font-semibold text-gray-600 text-xs uppercase tracking-wider w-[140px] min-w-[140px]">
                     <div>{c.label}</div>
                     <div className="text-[10px] font-normal text-gray-400 normal-case mt-0.5">{fmtDate(c.runAt)}</div>
                   </th>
