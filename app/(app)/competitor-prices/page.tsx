@@ -239,7 +239,7 @@ export default function CompetitorPricesPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Competitor Prices</h1>
           <p className="text-sm text-gray-500 mt-1">
-            £/m² inc VAT · 1000 × 1000mm · 3mm Clear Acrylic · delta vs previous run
+            £/m² inc VAT · 1000 × 1000mm · delta vs previous run
           </p>
         </div>
         <button
