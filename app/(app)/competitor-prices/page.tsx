@@ -272,6 +272,9 @@ export default function CompetitorPricesPage() {
                 <th className="px-4 py-3 text-right font-semibold text-xs uppercase tracking-wider text-[#1a8a7a] bg-[#2DBDAA]/10">
                   Cut My
                 </th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-500 text-xs uppercase tracking-wider bg-gray-50/80">
+                  Avg
+                </th>
                 {data.competitors.map(c => (
                   <th key={c.slug} className="px-4 py-3 text-right font-semibold text-gray-600 text-xs uppercase tracking-wider">
                     <div>{c.label}</div>
@@ -285,6 +288,12 @@ export default function CompetitorPricesPage() {
             <tbody className="divide-y divide-gray-50">
               {data.basketItems.map(item => {
                 const cutMyPrice = data.cutMyPrices[item.id] ?? null
+                const competitorPrices = data.competitors
+                  .map(c => c.prices.find(p => p.basketItemId === item.id)?.pricePerM2 ?? null)
+                  .filter((p): p is number => p !== null)
+                const avgPrice = competitorPrices.length
+                  ? competitorPrices.reduce((a, b) => a + b, 0) / competitorPrices.length
+                  : null
                 return (
                   <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-4 py-3">
@@ -315,6 +324,9 @@ export default function CompetitorPricesPage() {
                       )}
                     </td>
                     <PriceCell cutMyPrice={cutMyPrice} isCutMy />
+                    <td className="px-4 py-3 text-right text-sm font-mono tabular-nums text-gray-500 bg-gray-50/40">
+                      {fmt(avgPrice)}
+                    </td>
                     {data.competitors.map(c => {
                       const entry = c.prices.find(x => x.basketItemId === item.id)
                       return (
