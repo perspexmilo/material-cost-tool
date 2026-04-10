@@ -1,13 +1,20 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
+import type { NextRequest } from 'next/server'
 
-const COMPETITORS = [
+const PLASTIC_COMPETITORS = [
   'simply-plastics',
   'plastic-people',
   'cut-plastic-sheeting',
   'sheet-plastics',
   'plastic-sheet-shop',
   'plastic-sheets',
+] as const
+
+const WOOD_COMPETITORS = [
+  'mdf-direct',
+  'wood-sheets',
+  'cnc-creations',
 ] as const
 
 const COMPETITOR_LABELS: Record<string, string> = {
@@ -17,12 +24,21 @@ const COMPETITOR_LABELS: Record<string, string> = {
   'sheet-plastics':       'Sheet Plastics',
   'plastic-sheet-shop':   'Plastic Sheet Shop',
   'plastic-sheets':       'Plastic Sheets',
+  'mdf-direct':           'MDF Direct',
+  'wood-sheets':          'Wood Sheets',
+  'cnc-creations':        'CNC Creations',
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const category = req.nextUrl.searchParams.get('category') ?? 'plastic'
+  const COMPETITORS = category === 'wood' ? WOOD_COMPETITORS : PLASTIC_COMPETITORS
+
   try {
     const basketItems = await prisma.competitorBasketItem.findMany({
-      where: { active: true },
+      where: {
+        active: true,
+        category: category === 'wood' ? 'Wood' : 'Plastic',
+      },
       orderBy: { createdAt: 'asc' },
     })
 
