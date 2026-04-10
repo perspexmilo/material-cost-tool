@@ -12,6 +12,7 @@ interface BasketItem {
   heightMm: number
   magentoEntityId: number | null
   cutMyVariantName: string | null
+  variantType: string | null
 }
 
 interface PriceEntry {
@@ -231,11 +232,30 @@ export default function CompetitorPricesPage() {
   })
 
   const [editingItem, setEditingItem] = useState<BasketItem | null>(null)
+  const [activeType, setActiveType] = useState<string | null>(null)
+
+  // Derive unique variantTypes from mapped items, preserve insertion order
+  const variantTypes = data
+    ? Array.from(
+        new Set(
+          data.basketItems
+            .map(i => i.variantType)
+            .filter((t): t is string => t !== null)
+        )
+      )
+    : []
+
+  // Filter: unmapped items (no variantType) always show
+  const visibleItems = data
+    ? data.basketItems.filter(
+        i => activeType === null || i.variantType === null || i.variantType === activeType
+      )
+    : []
 
   return (
     <div className="p-8 max-w-[1400px]">
       {/* Header */}
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Competitor Prices</h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -251,6 +271,37 @@ export default function CompetitorPricesPage() {
           Refresh
         </button>
       </div>
+
+      {/* Variant type filter pills */}
+      {variantTypes.length > 0 && (
+        <div className="flex items-center gap-2 mb-6 flex-wrap">
+          <button
+            onClick={() => setActiveType(null)}
+            className={[
+              'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+              activeType === null
+                ? 'bg-[#2DBDAA] text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+            ].join(' ')}
+          >
+            All
+          </button>
+          {variantTypes.map(type => (
+            <button
+              key={type}
+              onClick={() => setActiveType(type === activeType ? null : type)}
+              className={[
+                'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                activeType === type
+                  ? 'bg-[#2DBDAA] text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+              ].join(' ')}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+      )}
 
       {isLoading && (
         <div className="flex items-center justify-center h-48 text-gray-400 text-sm">Loading…</div>
@@ -286,7 +337,7 @@ export default function CompetitorPricesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {data.basketItems.map(item => {
+              {visibleItems.map(item => {
                 const cutMyPrice = data.cutMyPrices[item.id] ?? null
                 const competitorPrices = data.competitors
                   .map(c => c.prices.find(p => p.basketItemId === item.id)?.pricePerM2 ?? null)
@@ -339,9 +390,11 @@ export default function CompetitorPricesPage() {
             </tbody>
           </table>
 
-          {data.basketItems.length === 0 && (
+          {visibleItems.length === 0 && (
             <div className="text-center py-12 text-gray-400 text-sm">
-              No basket items found. Run the seed script in competitor-scraper to add items.
+              {activeType
+                ? `No items matched "${activeType}". Try a different filter or map variants using the pencil icon.`
+                : 'No basket items found. Run the seed script in competitor-scraper to add items.'}
             </div>
           )}
         </div>

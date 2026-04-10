@@ -26,23 +26,54 @@ export async function GET() {
       orderBy: { createdAt: 'asc' },
     })
 
-    // For each competitor, get the two most recent successful runs
+    // For each competitor, get the latest AND second-latest price per basket item.
+    // We use a window function so partial scrapes (e.g. --colour Black only) don't
+    // wipe out Clear prices — each item independently tracks its own history.
     const competitorData = await Promise.all(
       COMPETITORS.map(async (slug) => {
-        const runs = await prisma.competitorRun.findMany({
-          where: { competitor: slug, status: { in: ['success', 'partial'] } },
-          orderBy: { runAt: 'desc' },
-          take: 2,
-          include: { prices: true },
-        })
-        const [current, previous] = runs
-        return { slug, label: COMPETITOR_LABELS[slug], current, previous }
+        const rows = await prisma.$queryRaw<Array<{
+          basket_item_id: string
+          price_per_m2: string | null
+          raw_value: string | null
+          run_at: Date
+          rn: bigint
+        }>>`
+          WITH ranked AS (
+            SELECT
+              cp.basket_item_id,
+              cp.price_per_m2,
+              cp.raw_value,
+              cr.run_at,
+              ROW_NUMBER() OVER (
+                PARTITION BY cp.basket_item_id
+                ORDER BY cr.run_at DESC
+              ) AS rn
+            FROM competitor_prices cp
+            JOIN competitor_runs cr ON cp.run_id = cr.id
+            WHERE cr.competitor = ${slug}
+              AND cr.status IN ('success', 'partial')
+          )
+          SELECT * FROM ranked WHERE rn <= 2
+          ORDER BY basket_item_id, rn
+        `
+
+        const currentByItem: Record<string, (typeof rows)[0]> = {}
+        const previousByItem: Record<string, (typeof rows)[0]> = {}
+        for (const row of rows) {
+          if (Number(row.rn) === 1) currentByItem[row.basket_item_id] = row
+          else if (Number(row.rn) === 2) previousByItem[row.basket_item_id] = row
+        }
+        // Use the most recent run_at across all items as the display timestamp
+        const latestRunAt = rows.find((r) => Number(r.rn) === 1)?.run_at ?? null
+
+        return { slug, label: COMPETITOR_LABELS[slug], currentByItem, previousByItem, latestRunAt }
       })
     )
 
-    // For each basket item, get Cut My's retail price via magentoEntityId
+    // For each basket item, get Cut My's retail price, variant name, and variantType
     const cutMyPrices: Record<string, number | null> = {}
     const cutMyNames: Record<string, string | null> = {}
+    const cutMyVariantTypes: Record<string, string | null> = {}
     for (const item of basketItems) {
       if (item.magentoEntityId) {
         const material = await prisma.material.findFirst({
@@ -56,9 +87,11 @@ export async function GET() {
           cutMyPrices[item.id] = null
         }
         cutMyNames[item.id] = material?.magentoName ?? null
+        cutMyVariantTypes[item.id] = material?.variantType ?? null
       } else {
         cutMyPrices[item.id] = null
         cutMyNames[item.id] = null
+        cutMyVariantTypes[item.id] = null
       }
     }
 
@@ -71,24 +104,20 @@ export async function GET() {
         heightMm: i.heightMm,
         magentoEntityId: i.magentoEntityId ?? null,
         cutMyVariantName: cutMyNames[i.id] ?? null,
+        variantType: cutMyVariantTypes[i.id] ?? null,
       })),
-      competitors: competitorData.map(({ slug, label, current, previous }) => ({
+      competitors: competitorData.map(({ slug, label, currentByItem, previousByItem, latestRunAt }) => ({
         slug,
         label,
-        runAt: current?.runAt ?? null,
-        previousRunAt: previous?.runAt ?? null,
+        runAt: latestRunAt ?? null,
         prices: basketItems.map((item) => {
-          const currentPrice = current?.prices.find((p) => p.basketItemId === item.id)
-          const previousPrice = previous?.prices.find((p) => p.basketItemId === item.id)
+          const cur = currentByItem[item.id]
+          const prev = previousByItem[item.id]
           return {
             basketItemId: item.id,
-            pricePerM2: currentPrice?.pricePerM2 !== null && currentPrice?.pricePerM2 !== undefined
-              ? Number(currentPrice.pricePerM2)
-              : null,
-            previousPricePerM2: previousPrice?.pricePerM2 !== null && previousPrice?.pricePerM2 !== undefined
-              ? Number(previousPrice.pricePerM2)
-              : null,
-            rawValue: currentPrice?.rawValue ?? null,
+            pricePerM2: cur?.price_per_m2 != null ? Number(cur.price_per_m2) : null,
+            previousPricePerM2: prev?.price_per_m2 != null ? Number(prev.price_per_m2) : null,
+            rawValue: cur?.raw_value ?? null,
           }
         }),
       })),
