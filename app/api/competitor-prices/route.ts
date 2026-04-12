@@ -92,10 +92,11 @@ export async function GET(req: NextRequest) {
       })
     )
 
-    // For each basket item, get Cut My's retail price, variant name, and variantType
+    // For each basket item, get Cut My's retail price, variant name, variantType, and typeFinish
     const cutMyPrices: Record<string, number | null> = {}
     const cutMyNames: Record<string, string | null> = {}
     const cutMyVariantTypes: Record<string, string | null> = {}
+    const cutMyTypeFinishes: Record<string, string | null> = {}
     for (const item of basketItems) {
       if (item.magentoEntityId) {
         const material = await prisma.material.findFirst({
@@ -110,10 +111,12 @@ export async function GET(req: NextRequest) {
         }
         cutMyNames[item.id] = material?.magentoName ?? null
         cutMyVariantTypes[item.id] = material?.variantType ?? null
+        cutMyTypeFinishes[item.id] = material?.typeFinish ?? null
       } else {
         cutMyPrices[item.id] = null
         cutMyNames[item.id] = null
         cutMyVariantTypes[item.id] = null
+        cutMyTypeFinishes[item.id] = null
       }
     }
 
@@ -127,6 +130,7 @@ export async function GET(req: NextRequest) {
         magentoEntityId: i.magentoEntityId ?? null,
         cutMyVariantName: cutMyNames[i.id] ?? null,
         variantType: cutMyVariantTypes[i.id] ?? null,
+        typeFinish: cutMyTypeFinishes[i.id] ?? null,
       })),
       competitors: competitorData.map(({ slug, label, currentByItem, previousByItem, latestRunAt }) => ({
         slug,

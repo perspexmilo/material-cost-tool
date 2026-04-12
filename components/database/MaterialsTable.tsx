@@ -160,6 +160,11 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
     ...externalFilters,
   }
 
+  // Only use SSR initial data when no filters are active — filters must trigger a real fetch
+  // so that the new queryKey starts with undefined (proper loading state) instead of stale
+  // unfiltered rows, which caused filtered results to show wrong data.
+  const hasNoFilters = !queryFilters.search && !queryFilters.category && !queryFilters.typeFinish && !queryFilters.supplierId
+
   const {
     data: pagedData,
     fetchNextPage,
@@ -185,10 +190,12 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
       const loaded = allPages.reduce((sum, p) => sum + p.materials.length, 0)
       return loaded < lastPage.total ? loaded : undefined
     },
-    initialData: {
-      pages: [{ materials: initialData, total: initialTotal }],
-      pageParams: [0],
-    },
+    ...(hasNoFilters && {
+      initialData: {
+        pages: [{ materials: initialData, total: initialTotal }],
+        pageParams: [0],
+      },
+    }),
     staleTime: 30 * 1000,
   })
 

@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { RefreshCw, TrendingUp, TrendingDown, Pencil, X, Check } from 'lucide-react'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 
 interface BasketItem {
   id: string
@@ -13,6 +13,7 @@ interface BasketItem {
   magentoEntityId: number | null
   cutMyVariantName: string | null
   variantType: string | null
+  typeFinish: string | null
 }
 
 interface PriceEntry {
@@ -207,60 +208,98 @@ export function CompetitorPricesView({ category }: Props) {
   const { data, isLoading, isError, refetch, isFetching } = useQuery<ApiResponse>({
     queryKey: ['competitor-prices', category],
     queryFn: () => fetch(`/api/competitor-prices?category=${category}`).then(r => r.json()),
-    staleTime: 10 * 60 * 1000, // 10 minutes — prices only change when scrapers run
+    staleTime: 10 * 60 * 1000,
   })
 
   const [editingItem, setEditingItem] = useState<BasketItem | null>(null)
-  const [activeType, setActiveType] = useState<string | null>(null)
+  const [filterMaterial, setFilterMaterial] = useState('')
+  const [filterType, setFilterType] = useState('')
 
-  const variantTypes = data
-    ? Array.from(new Set(data.basketItems.map(i => i.variantType).filter((t): t is string => t !== null)))
-    : []
+  const materialOptions = useMemo(() => {
+    if (!data) return []
+    return Array.from(new Set(
+      data.basketItems.map(i => i.typeFinish).filter((t): t is string => t !== null)
+    )).sort()
+  }, [data])
 
-  const visibleItems = data
-    ? data.basketItems.filter(i => activeType === null || i.variantType === null || i.variantType === activeType)
-    : []
+  const typeOptions = useMemo(() => {
+    if (!data) return []
+    const items = filterMaterial
+      ? data.basketItems.filter(i => i.typeFinish === filterMaterial)
+      : data.basketItems
+    return Array.from(new Set(
+      items.map(i => i.variantType).filter((t): t is string => t !== null)
+    )).sort()
+  }, [data, filterMaterial])
 
-  const title = category === 'wood' ? 'Wood Competitor Prices' : 'Plastic Competitor Prices'
+  const visibleItems = useMemo(() => {
+    if (!data) return []
+    return data.basketItems.filter(i => {
+      if (filterMaterial && i.typeFinish !== filterMaterial) return false
+      if (filterType && i.variantType !== filterType) return false
+      return true
+    })
+  }, [data, filterMaterial, filterType])
+
+  const hasActiveFilters = !!(filterMaterial || filterType)
+
+  function clearFilters() {
+    setFilterMaterial('')
+    setFilterType('')
+  }
 
   return (
-    <div className="p-8 max-w-[1400px]">
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{title}</h1>
-          <p className="text-sm text-gray-500 mt-1">
+    <div className="flex flex-col">
+      {/* Sticky filter bar */}
+      <div className="sticky top-0 z-30 bg-[#F7F7F5] pt-4">
+        <div className="flex items-center justify-between pb-3">
+          <p className="text-[12px] text-gray-400">
             £/m² inc VAT · 1000 × 1000mm · delta vs previous run
           </p>
-        </div>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-        >
-          <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
-          Refresh
-        </button>
-      </div>
-
-      {variantTypes.length > 0 && (
-        <div className="flex items-center gap-2 mb-6 flex-wrap">
           <button
-            onClick={() => setActiveType(null)}
-            className={['px-3 py-1.5 rounded-full text-xs font-medium transition-colors', activeType === null ? 'bg-[#2DBDAA] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'].join(' ')}
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#E5E5E3] text-[12px] font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors bg-white"
           >
-            All
+            <RefreshCw size={13} className={isFetching ? 'animate-spin' : ''} />
+            Refresh
           </button>
-          {variantTypes.map(type => (
-            <button
-              key={type}
-              onClick={() => setActiveType(type === activeType ? null : type)}
-              className={['px-3 py-1.5 rounded-full text-xs font-medium transition-colors', activeType === type ? 'bg-[#2DBDAA] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'].join(' ')}
-            >
-              {type}
-            </button>
-          ))}
         </div>
-      )}
+
+        <div className="pb-4 flex items-center gap-2">
+          {materialOptions.length > 0 && (
+            <select
+              value={filterMaterial}
+              onChange={(e) => { setFilterMaterial(e.target.value); setFilterType('') }}
+              className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
+            >
+              <option value="">All materials</option>
+              {materialOptions.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          )}
+
+          {typeOptions.length > 0 && (
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
+            >
+              <option value="">All types</option>
+              {typeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          )}
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="flex items-center gap-1 text-[12px] text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X size={12} /> Clear filters
+            </button>
+          )}
+        </div>
+      </div>
 
       {isLoading && <div className="flex items-center justify-center h-48 text-gray-400 text-sm">Loading…</div>}
       {isError && (
@@ -270,7 +309,7 @@ export function CompetitorPricesView({ category }: Props) {
       )}
 
       {data && (
-        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+        <div className="relative z-0 rounded-xl border border-gray-200 bg-white shadow-sm">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
@@ -284,7 +323,7 @@ export function CompetitorPricesView({ category }: Props) {
                   Avg
                 </th>
                 {data.competitors.map(c => (
-                  <th key={c.slug} className="px-4 py-3 text-right font-semibold text-gray-600 text-xs uppercase tracking-wider w-[140px] min-w-[140px]">
+                  <th key={c.slug} className="px-4 py-3 text-right font-semibold text-gray-600 text-xs uppercase tracking-wider w-[140px] min-w-[140px] bg-gray-50">
                     <div>{c.label}</div>
                     <div className="text-[10px] font-normal text-gray-400 normal-case mt-0.5">{fmtDate(c.runAt)}</div>
                   </th>
@@ -338,8 +377,8 @@ export function CompetitorPricesView({ category }: Props) {
           </table>
           {visibleItems.length === 0 && (
             <div className="text-center py-12 text-gray-400 text-sm">
-              {activeType
-                ? `No items matched "${activeType}". Try a different filter or map variants using the pencil icon.`
+              {hasActiveFilters
+                ? 'No items matched the current filters.'
                 : 'No basket items found. Run the seed script in competitor-scraper to add items.'}
             </div>
           )}
