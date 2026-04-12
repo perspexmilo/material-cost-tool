@@ -207,6 +207,7 @@ export function CompetitorPricesView({ category }: Props) {
   const { data, isLoading, isError, refetch, isFetching } = useQuery<ApiResponse>({
     queryKey: ['competitor-prices', category],
     queryFn: () => fetch(`/api/competitor-prices?category=${category}`).then(r => r.json()),
+    staleTime: 10 * 60 * 1000, // 10 minutes — prices only change when scrapers run
   })
 
   const [editingItem, setEditingItem] = useState<BasketItem | null>(null)
