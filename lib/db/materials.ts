@@ -76,12 +76,14 @@ export async function getMaterials(
   const where: {
     category?: string
     typeFinish?: string
+    variantType?: string
     supplierId?: string
     OR?: Array<{ description?: { contains: string; mode: 'insensitive' } | { contains: string } }>
   } = {}
 
   if (filters?.category) where.category = filters.category
   if (filters?.typeFinish) where.typeFinish = filters.typeFinish
+  if (filters?.variantType) where.variantType = filters.variantType
   if (filters?.supplierId) where.supplierId = filters.supplierId
   if (filters?.search) {
     where.OR = [

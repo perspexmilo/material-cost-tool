@@ -142,6 +142,7 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
   const [search, setSearch]             = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [filterType, setFilterType]     = useState('')
+  const [filterVariantType, setFilterVariantType] = useState('')
   const [filterSupplierId, setFilterSupplierId] = useState('')
   const [sortCol, setSortCol]           = useState<SortColumn>('variantType')
   const [sortDir, setSortDir]           = useState<SortDir>('asc')
@@ -157,6 +158,7 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
     search: search || undefined,
     category: filterCategory || undefined,
     typeFinish: filterType || undefined,
+    variantType: filterVariantType || undefined,
     supplierId: filterSupplierId || undefined,
     ...externalFilters,
   }
@@ -164,7 +166,7 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
   // Only use SSR initial data when no filters are active — filters must trigger a real fetch
   // so that the new queryKey starts with undefined (proper loading state) instead of stale
   // unfiltered rows, which caused filtered results to show wrong data.
-  const hasNoFilters = !queryFilters.search && !queryFilters.category && !queryFilters.typeFinish && !queryFilters.supplierId
+  const hasNoFilters = !queryFilters.search && !queryFilters.category && !queryFilters.typeFinish && !queryFilters.variantType && !queryFilters.supplierId
 
   const {
     data: pagedData,
@@ -179,6 +181,7 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
       if (queryFilters.search) params.set('search', queryFilters.search)
       if (queryFilters.category) params.set('category', queryFilters.category)
       if (queryFilters.typeFinish) params.set('typeFinish', queryFilters.typeFinish)
+      if (queryFilters.variantType) params.set('variantType', queryFilters.variantType)
       if (queryFilters.supplierId) params.set('supplierId', queryFilters.supplierId)
       params.set('limit', String(PAGE_SIZE))
       params.set('offset', String(pageParam))
@@ -234,7 +237,7 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
 
   const groups = useMemo(() => groupMaterials(materials), [materials])
 
-  const hasActiveFilters = !!(filterCategory || filterType || filterSupplierId)
+  const hasActiveFilters = !!(filterCategory || filterType || filterVariantType || filterSupplierId)
 
   function handleSort(col: SortColumn) {
     if (col === sortCol) setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
@@ -244,6 +247,7 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
   function clearFilters() {
     setFilterCategory('')
     setFilterType('')
+    setFilterVariantType('')
     setFilterSupplierId('')
   }
 
@@ -413,8 +417,17 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
             onChange={(e) => setFilterType(e.target.value)}
             className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
           >
-            <option value="">All types</option>
+            <option value="">All materials</option>
             {typeFinishes.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+
+          <select
+            value={filterVariantType}
+            onChange={(e) => setFilterVariantType(e.target.value)}
+            className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
+          >
+            <option value="">All types</option>
+            {variantTypes.map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
 
           <select

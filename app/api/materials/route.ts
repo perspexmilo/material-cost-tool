@@ -9,11 +9,13 @@ export async function GET(request: NextRequest) {
     const filters: MaterialFilters = {}
     const category = searchParams.get('category')
     const typeFinish = searchParams.get('typeFinish')
+    const variantType = searchParams.get('variantType')
     const supplierId = searchParams.get('supplierId')
     const search = searchParams.get('search')
 
     if (category) filters.category = category
     if (typeFinish) filters.typeFinish = typeFinish
+    if (variantType) filters.variantType = variantType
     if (supplierId) filters.supplierId = supplierId
     if (search) filters.search = search
 

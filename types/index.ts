@@ -81,6 +81,7 @@ export type UpdateSource = 'manual' | 'email-parse' | 'import' | 'staged'
 export interface MaterialFilters {
   category?: string
   typeFinish?: string
+  variantType?: string
   supplierId?: string
   search?: string
 }
