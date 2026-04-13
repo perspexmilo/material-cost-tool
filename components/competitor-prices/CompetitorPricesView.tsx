@@ -267,7 +267,7 @@ export function CompetitorPricesView({ category }: Props) {
           </button>
         </div>
 
-        <div className="pb-4 flex items-center gap-2">
+        <div className="h-11 flex items-center gap-2">
           {materialOptions.length > 0 && (
             <select
               value={filterMaterial}
@@ -311,9 +311,9 @@ export function CompetitorPricesView({ category }: Props) {
 
       {data && (
         <div className="relative z-0 rounded-xl border border-gray-200 bg-white shadow-sm">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
+          <table className="w-full text-sm border-separate border-spacing-0">
+            <thead className="sticky top-[102px] z-20">
+              <tr className="bg-gray-50" style={{ boxShadow: 'inset 0 -1px 0 #E5E5E3' }}>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wider">
                   Variant
                 </th>
