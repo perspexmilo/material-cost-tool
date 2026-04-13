@@ -298,6 +298,7 @@ export async function createMaterial(data: {
 
 export async function updateMaterial(id: string, data: {
   description?: string
+  magentoName?: string | null
   markupMultiplier?: number | null
   variantType?: string | null
   magentoSku?: string | null
@@ -323,6 +324,7 @@ export async function updateMaterial(id: string, data: {
 
   const updateData = {
     ...(data.description !== undefined && { description: data.description }),
+    ...(data.magentoName !== undefined && { magentoName: data.magentoName }),
     ...(data.markupMultiplier !== undefined && { markupMultiplier: data.markupMultiplier }),
     ...(data.variantType !== undefined && { variantType: data.variantType }),
     ...(data.magentoSku !== undefined && { magentoSku: data.magentoSku }),

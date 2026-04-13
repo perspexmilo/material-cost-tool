@@ -126,12 +126,12 @@ function parseMetabaseRow(row: Record<string, string>, supplierId: string) {
 }
 
 function parseTemplateRow(row: Record<string, string>, supplierId: string) {
-  const magentoName = row['magento_name']?.trim() || null
   const magentoEntityIdRaw = row['magento_entity_id']?.trim().replace(/,/g, '') ?? ''
   const magentoEntityId = magentoEntityIdRaw ? parseInt(magentoEntityIdRaw, 10) : null
   const category = row['category']?.trim() || 'Accessories'
   const typeFinish = row['type_finish']?.trim() || 'Other'
-  const description = row['description']?.trim() || row['magento_sku']?.trim() || ''
+  const description = row['description']?.trim() || row['magento_name']?.trim() || row['magento_sku']?.trim() || ''
+  const magentoName = row['magento_name']?.trim() || description || null
   const thicknessMm = parseFloat(row['thickness_mm']?.trim() ?? '0') || 0
   const widthMm = parseFloat(row['width_mm']?.trim() ?? '0') || 0
   const heightMm = parseFloat(row['height_mm']?.trim() ?? '0') || 0

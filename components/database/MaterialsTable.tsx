@@ -301,7 +301,7 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
     setEditingId(id)
     setEditError(null)
     setEditValues({
-      description:  material.description,
+      description:  material.magentoName ?? material.description,
       variantType:  material.variantType ?? '',
       magentoSku:   material.magentoSku ?? '',
       magentoEntityId: material.magentoEntityId != null ? String(material.magentoEntityId) : '',
@@ -331,6 +331,7 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           description:  values.description,
+          magentoName:  values.description || null,
           variantType:  values.variantType || null,
           magentoSku:   values.magentoSku || null,
           magentoEntityId: values.magentoEntityId.trim() !== '' ? parseInt(values.magentoEntityId.trim(), 10) : null,
@@ -454,7 +455,7 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
                   onChange={toggleSelectAll} className="cursor-pointer accent-[#2DBDAA]"
                 />
               </th>
-              <SortTh col="description"   label="Description"   activeCol={sortCol} dir={sortDir} onSort={handleSort} className="text-left w-[240px]" />
+              <SortTh col="description"   label="Variant Name"  activeCol={sortCol} dir={sortDir} onSort={handleSort} className="text-left w-[240px]" />
               <SortTh col="variantType"   label="Variant Type"  activeCol={sortCol} dir={sortDir} onSort={handleSort} className="text-left w-[160px]" />
               <th className="text-left px-4 py-3 text-gray-500 w-[150px]">Magento SKU</th>
               <SortTh col="thicknessMm"   label="Thickness"     activeCol={sortCol} dir={sortDir} onSort={handleSort} className="text-left w-[90px]" />
@@ -616,7 +617,7 @@ function GroupRows({ group, expandedId, selectedIds, onToggle, onSelect, editing
                 <td className="px-4 py-3" onClick={(e) => { e.stopPropagation(); onSelect(material.id) }}>
                   <input type="checkbox" checked={isSelected} onChange={() => onSelect(material.id)} onClick={(e) => e.stopPropagation()} className="cursor-pointer accent-[#2DBDAA]" />
                 </td>
-                <td className="px-4 py-3 text-[13px] text-gray-900 font-medium">{material.description}</td>
+                <td className="px-4 py-3 text-[13px] text-gray-900 font-medium">{material.magentoName ?? material.description}</td>
                 <td className="px-4 py-3">
                   {material.variantType
                     ? <span className="text-[12px] text-gray-600">{material.variantType}</span>

@@ -71,6 +71,7 @@ export function AddVariantDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           description:  values.description.trim(),
+          magentoName:  values.description.trim() || null,
           category:     values.category.trim(),
           typeFinish:   values.typeFinish.trim(),
           variantType:  values.variantType.trim() || null,
@@ -127,7 +128,7 @@ export function AddVariantDialog({
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             {/* Description — full width */}
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Description *</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Variant Name *</label>
               <input value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="e.g. 12mm White MDF" className={fieldClass} />
             </div>
 
