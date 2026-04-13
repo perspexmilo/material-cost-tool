@@ -39,8 +39,9 @@ interface ApiResponse {
 
 interface MaterialOption {
   magentoEntityId: number
-  magentoName: string
-  magentoSku: string
+  magentoName: string | null
+  magentoSku: string | null
+  description: string
 }
 
 function fmt(value: number | null | undefined): string {
@@ -180,7 +181,7 @@ function VariantPicker({ item, onClose }: { item: BasketItem; onClose: () => voi
                 className={['w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors flex items-center justify-between gap-3', isSelected ? 'bg-[#2DBDAA]/5' : ''].join(' ')}
               >
                 <div className="min-w-0">
-                  <span className="text-sm text-gray-800 block truncate">{m.magentoName}</span>
+                  <span className="text-sm text-gray-800 block truncate">{m.magentoName ?? m.description ?? m.magentoSku ?? `ID ${m.magentoEntityId}`}</span>
                   <span className="text-xs text-gray-400">{m.magentoSku} · ID {m.magentoEntityId}</span>
                 </div>
                 {isSelected && <Check size={14} className="text-[#2DBDAA] shrink-0" />}

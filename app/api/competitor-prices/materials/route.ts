@@ -10,6 +10,7 @@ export async function GET() {
         magentoEntityId: true,
         magentoName: true,
         magentoSku: true,
+        description: true,
       },
       orderBy: { magentoName: 'asc' },
     })
