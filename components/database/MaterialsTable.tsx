@@ -32,6 +32,7 @@ interface EditValues {
   description: string
   variantType: string
   magentoSku: string
+  magentoEntityId: string
   thicknessMm: string
   widthMm: string
   heightMm: string
@@ -303,6 +304,7 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
       description:  material.description,
       variantType:  material.variantType ?? '',
       magentoSku:   material.magentoSku ?? '',
+      magentoEntityId: material.magentoEntityId != null ? String(material.magentoEntityId) : '',
       thicknessMm:  String(material.thicknessMm),
       widthMm:      String(material.widthMm),
       heightMm:     String(material.heightMm),
@@ -331,6 +333,7 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
           description:  values.description,
           variantType:  values.variantType || null,
           magentoSku:   values.magentoSku || null,
+          magentoEntityId: values.magentoEntityId.trim() !== '' ? parseInt(values.magentoEntityId.trim(), 10) : null,
           thicknessMm:  parseFloat(values.thicknessMm),
           widthMm:      parseFloat(values.widthMm),
           heightMm:     parseFloat(values.heightMm),
@@ -553,7 +556,10 @@ function GroupRows({ group, expandedId, selectedIds, onToggle, onSelect, editing
                 </td>
                 <td className="px-4 py-2">{editInput('description')}</td>
                 <td className="px-4 py-2">{editInput('variantType')}</td>
-                <td className="px-4 py-2">{editInput('magentoSku')}</td>
+                <td className="px-4 py-2">
+                  {editInput('magentoSku')}
+                  <div className="text-[10px] text-gray-400 mt-1">SKU · Entity ID: {editInput('magentoEntityId', { type: 'number', className: 'w-20' })}</div>
+                </td>
                 <td className="px-4 py-2">{editInput('thicknessMm', { type: 'number' })}</td>
                 <td className="px-4 py-2">
                   <div className="flex items-center gap-1">

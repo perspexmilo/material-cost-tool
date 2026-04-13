@@ -19,6 +19,7 @@ interface FormValues {
   typeFinish:   string
   variantType:  string
   magentoSku:   string
+  magentoEntityId: string
   thicknessMm:  string
   widthMm:      string
   heightMm:     string
@@ -33,6 +34,7 @@ const EMPTY: FormValues = {
   typeFinish:   '',
   variantType:  '',
   magentoSku:   '',
+  magentoEntityId: '',
   thicknessMm:  '',
   widthMm:      '',
   heightMm:     '',
@@ -73,6 +75,7 @@ export function AddVariantDialog({
           typeFinish:   values.typeFinish.trim(),
           variantType:  values.variantType.trim() || null,
           magentoSku:   values.magentoSku.trim()  || null,
+          magentoEntityId: values.magentoEntityId.trim() !== '' ? parseInt(values.magentoEntityId.trim(), 10) : null,
           thicknessMm:  parseFloat(values.thicknessMm),
           widthMm:      parseFloat(values.widthMm),
           heightMm:     parseFloat(values.heightMm),
@@ -153,6 +156,12 @@ export function AddVariantDialog({
                 <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Magento SKU</label>
                 <input value={form.magentoSku} onChange={(e) => set('magentoSku', e.target.value)} placeholder="e.g. 12-white-mdf" className={fieldClass} />
               </div>
+            </div>
+
+            {/* Magento Entity ID */}
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Magento Entity ID</label>
+              <input value={form.magentoEntityId} onChange={(e) => set('magentoEntityId', e.target.value)} placeholder="e.g. 4059 — required to appear in competitor price picker" type="number" className={fieldClass} />
             </div>
 
             {/* Thickness + Supplier */}

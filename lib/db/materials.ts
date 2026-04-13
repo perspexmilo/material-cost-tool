@@ -266,6 +266,7 @@ export async function createMaterial(data: {
   markupMultiplier?: number | null
   variantType?: string | null
   magentoSku?: string | null
+  magentoEntityId?: number | null
 }): Promise<Material> {
   const supplier = await prisma.supplier.upsert({
     where: { name: data.supplierName },
@@ -286,6 +287,7 @@ export async function createMaterial(data: {
       markupMultiplier: data.markupMultiplier ?? null,
       variantType:  data.variantType || null,
       magentoSku:   data.magentoSku || null,
+      magentoEntityId: data.magentoEntityId ?? null,
       updateSource: 'manual',
     },
     include: { supplier: true },
@@ -299,6 +301,7 @@ export async function updateMaterial(id: string, data: {
   markupMultiplier?: number | null
   variantType?: string | null
   magentoSku?: string | null
+  magentoEntityId?: number | null
   thicknessMm?: number
   widthMm?: number
   heightMm?: number
@@ -323,6 +326,7 @@ export async function updateMaterial(id: string, data: {
     ...(data.markupMultiplier !== undefined && { markupMultiplier: data.markupMultiplier }),
     ...(data.variantType !== undefined && { variantType: data.variantType }),
     ...(data.magentoSku !== undefined && { magentoSku: data.magentoSku }),
+    ...(data.magentoEntityId !== undefined && { magentoEntityId: data.magentoEntityId }),
     ...(data.thicknessMm !== undefined && { thicknessMm: data.thicknessMm }),
     ...(data.widthMm !== undefined && { widthMm: data.widthMm }),
     ...(data.heightMm !== undefined && { heightMm: data.heightMm }),
