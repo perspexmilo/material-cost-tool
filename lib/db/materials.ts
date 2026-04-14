@@ -110,22 +110,44 @@ export async function getMaterials(
 }
 
 export async function getMaterialFilterOptions() {
-  const [categories, typeFinishes, suppliers, variantTypes] = await Promise.all([
+  const [categories, suppliers, categoryTypePairs, typeVariantPairs] = await Promise.all([
     prisma.material.findMany({ select: { category: true }, distinct: ['category'], orderBy: { category: 'asc' } }),
-    prisma.material.findMany({ select: { typeFinish: true }, distinct: ['typeFinish'], orderBy: { typeFinish: 'asc' } }),
     prisma.supplier.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    // All unique category + typeFinish combinations for cascading
     prisma.material.findMany({
-      select: { variantType: true },
-      distinct: ['variantType'],
+      select: { category: true, typeFinish: true },
+      distinct: ['category', 'typeFinish'],
+      orderBy: [{ category: 'asc' }, { typeFinish: 'asc' }],
+    }),
+    // All unique typeFinish + variantType combinations for cascading
+    prisma.material.findMany({
+      select: { typeFinish: true, variantType: true },
+      distinct: ['typeFinish', 'variantType'],
       where: { variantType: { not: null } },
-      orderBy: { variantType: 'asc' },
+      orderBy: [{ typeFinish: 'asc' }, { variantType: 'asc' }],
     }),
   ])
+
+  // Build cascading maps
+  const typeFinishByCategory: Record<string, string[]> = {}
+  for (const r of categoryTypePairs) {
+    if (!typeFinishByCategory[r.category]) typeFinishByCategory[r.category] = []
+    typeFinishByCategory[r.category].push(r.typeFinish)
+  }
+
+  const variantTypeByTypeFinish: Record<string, string[]> = {}
+  for (const r of typeVariantPairs) {
+    if (!variantTypeByTypeFinish[r.typeFinish]) variantTypeByTypeFinish[r.typeFinish] = []
+    variantTypeByTypeFinish[r.typeFinish].push(r.variantType as string)
+  }
+
   return {
     categories: categories.map((c) => c.category),
-    typeFinishes: typeFinishes.map((t) => t.typeFinish),
+    typeFinishes: categoryTypePairs.map((r) => r.typeFinish).filter((v, i, a) => a.indexOf(v) === i).sort(),
+    variantTypes: typeVariantPairs.map((r) => r.variantType as string).filter((v, i, a) => a.indexOf(v) === i).sort(),
     suppliers,
-    variantTypes: variantTypes.map((v) => v.variantType as string),
+    typeFinishByCategory,
+    variantTypeByTypeFinish,
   }
 }
 

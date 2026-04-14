@@ -15,8 +15,10 @@ const PAGE_SIZE = 100
 interface FilterOptions {
   categories: string[]
   typeFinishes: string[]
-  suppliers: { id: string; name: string }[]
   variantTypes: string[]
+  suppliers: { id: string; name: string }[]
+  typeFinishByCategory: Record<string, string[]>
+  variantTypeByTypeFinish: Record<string, string[]>
 }
 
 interface MaterialsTableProps {
@@ -218,19 +220,36 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
   })
 
   const categories  = filterOptions?.categories ?? [...new Set(allMaterials.map((m) => m.category))].sort()
-  const typeFinishes = useMemo(() => {
-    const base = filterOptions?.typeFinishes ?? [...new Set(allMaterials.map((m) => m.typeFinish))].sort()
-    return filterCategory
-      ? base.filter((t) => allMaterials.some((m) => m.category === filterCategory && m.typeFinish === t))
-      : base
-  }, [filterOptions, allMaterials, filterCategory])
   const supplierOptions = filterOptions?.suppliers ?? []
   const thicknesses = useMemo(() =>
     [...new Set(allMaterials.map((m) => String(m.thicknessMm)))].sort((a, b) => parseFloat(a) - parseFloat(b)),
     [allMaterials])
-  const variantTypes = useMemo(() =>
-    filterOptions?.variantTypes ?? [...new Set(allMaterials.map((m) => m.variantType).filter(Boolean) as string[])].sort(),
-    [filterOptions, allMaterials])
+
+  // Cascading typeFinishes: restricted to those valid for the selected category
+  const typeFinishes = useMemo(() => {
+    if (filterCategory && filterOptions?.typeFinishByCategory) {
+      return filterOptions.typeFinishByCategory[filterCategory] ?? []
+    }
+    return filterOptions?.typeFinishes ?? [...new Set(allMaterials.map((m) => m.typeFinish))].sort()
+  }, [filterOptions, allMaterials, filterCategory])
+
+  // Cascading variantTypes: restricted to those valid for the selected material (typeFinish),
+  // or — if only a category is selected — to all variantTypes within that category
+  const variantTypes = useMemo(() => {
+    const { variantTypeByTypeFinish, typeFinishByCategory } = filterOptions ?? {}
+    if (filterType && variantTypeByTypeFinish) {
+      return variantTypeByTypeFinish[filterType] ?? []
+    }
+    if (filterCategory && typeFinishByCategory && variantTypeByTypeFinish) {
+      const tfs = typeFinishByCategory[filterCategory] ?? []
+      const vts = new Set<string>()
+      for (const tf of tfs) {
+        for (const vt of (variantTypeByTypeFinish[tf] ?? [])) vts.add(vt)
+      }
+      return [...vts].sort()
+    }
+    return filterOptions?.variantTypes ?? [...new Set(allMaterials.map((m) => m.variantType).filter(Boolean) as string[])].sort()
+  }, [filterOptions, allMaterials, filterCategory, filterType])
 
   // Sort loaded materials (filtering is server-side)
   const materials = useMemo(() => sortMaterials(allMaterials, sortCol, sortDir), [allMaterials, sortCol, sortDir])
@@ -405,7 +424,7 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
         <div className="pb-4 flex items-center gap-2">
           <select
             value={filterCategory}
-            onChange={(e) => { setFilterCategory(e.target.value); setFilterType('') }}
+            onChange={(e) => { setFilterCategory(e.target.value); setFilterType(''); setFilterVariantType('') }}
             className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
           >
             <option value="">All categories</option>
@@ -414,10 +433,10 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
 
           <select
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
+            onChange={(e) => { setFilterType(e.target.value); setFilterVariantType('') }}
             className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
           >
-            <option value="">All materials</option>
+            <option value="">{filterCategory ? `All ${filterCategory.toLowerCase()} materials` : 'All materials'}</option>
             {typeFinishes.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
 
@@ -426,7 +445,7 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
             onChange={(e) => setFilterVariantType(e.target.value)}
             className="text-[12px] border border-[#E5E5E3] rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2DBDAA] focus:border-[#2DBDAA]"
           >
-            <option value="">All types</option>
+            <option value="">{filterType ? `All ${filterType.toLowerCase()} types` : 'All types'}</option>
             {variantTypes.map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
 
