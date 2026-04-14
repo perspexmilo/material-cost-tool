@@ -97,15 +97,15 @@ function col(row: Record<string, string>, ...keys: string[]): string {
 }
 
 function parseRow(row: Record<string, string>, defaultSupplierId: string) {
-  const entityIdRaw = col(row, 'entity_id').replace(/,/g, '')
+  const entityIdRaw = col(row, 'entity_id', 'magento_entity_id').replace(/,/g, '')
   const magentoEntityId = entityIdRaw ? parseInt(entityIdRaw, 10) : null
 
-  const variantName = col(row, 'name', 'Variant Name', 'Name')
+  const variantName = col(row, 'name', 'Variant Name', 'Name', 'magento_name')
   const magentoName = variantName || null
-  const description = variantName || col(row, 'sku')
+  const description = variantName || col(row, 'sku', 'magento_sku')
 
   // material = specific material type (acrylic, mdf, etc.) — stored as typeFinish
-  const material = col(row, 'material', 'Type', 'Material')
+  const material = col(row, 'material', 'Type', 'type_finish', 'Material')
 
   // category = Wood / Plastic — read directly or derive from material
   const categoryRaw = col(row, 'category')
@@ -114,11 +114,11 @@ function parseRow(row: Record<string, string>, defaultSupplierId: string) {
   const typeFinish = material || 'Other'
   const variantType = col(row, 'variant_type', 'Variant_Type') || null
 
-  const thicknessRaw = col(row, 'thickness', 'Thickness').replace(/mm$/i, '')
+  const thicknessRaw = col(row, 'thickness', 'Thickness', 'thickness_mm').replace(/mm$/i, '')
   const thicknessMm = parseFloat(thicknessRaw) || 0
-  const widthMm = parseFloat(col(row, 'cost_width', 'Cost_Width')) || 0
-  const heightMm = parseFloat(col(row, 'cost_length', 'Cost_Length')) || 0
-  const costPerSheet = parseFloat(col(row, 'cost', 'Cost')) || 0
+  const widthMm = parseFloat(col(row, 'cost_width', 'Cost_Width', 'width_mm')) || 0
+  const heightMm = parseFloat(col(row, 'cost_length', 'Cost_Length', 'height_mm')) || 0
+  const costPerSheet = parseFloat(col(row, 'cost', 'Cost', 'cost_per_sheet')) || 0
 
   const markupRaw = col(row, 'markup_multiplier')
   const markupMultiplier = markupRaw !== '' ? parseFloat(markupRaw) : null

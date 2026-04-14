@@ -135,15 +135,15 @@ async function run() {
     const sku = col(row, 'sku', 'magento_sku')
     if (!sku) { skipped++; continue }
 
-    const entityIdRaw = col(row, 'entity_id').replace(/,/g, '')
+    const entityIdRaw = col(row, 'entity_id', 'magento_entity_id').replace(/,/g, '')
     const magentoEntityId = entityIdRaw ? parseInt(entityIdRaw, 10) : null
 
-    const variantName = col(row, 'name', 'Variant Name', 'Name')
+    const variantName = col(row, 'name', 'Variant Name', 'Name', 'magento_name')
     const magentoName = variantName || null
     const description = variantName || sku
 
     // material = specific type (acrylic, mdf …) — stored as typeFinish
-    const material = col(row, 'material', 'Type', 'Material')
+    const material = col(row, 'material', 'Type', 'type_finish', 'Material')
 
     // category = Wood / Plastic — read directly or derive from material
     const categoryRaw = col(row, 'category')
@@ -152,10 +152,10 @@ async function run() {
     const typeFinish = material || 'Other'
     const variantType = col(row, 'variant_type', 'Variant_Type') || null
 
-    const thicknessMm = parseFloat(col(row, 'thickness', 'Thickness').replace(/mm$/i, '')) || 0
-    const widthMm  = parseFloat(col(row, 'cost_width',  'Cost_Width'))  || 0
-    const heightMm = parseFloat(col(row, 'cost_length', 'Cost_Length')) || 0
-    const costPerSheet = parseFloat(col(row, 'cost', 'Cost')) || 0
+    const thicknessMm = parseFloat(col(row, 'thickness', 'Thickness', 'thickness_mm').replace(/mm$/i, '')) || 0
+    const widthMm  = parseFloat(col(row, 'cost_width',  'Cost_Width',  'width_mm'))  || 0
+    const heightMm = parseFloat(col(row, 'cost_length', 'Cost_Length', 'height_mm')) || 0
+    const costPerSheet = parseFloat(col(row, 'cost', 'Cost', 'cost_per_sheet')) || 0
 
     const supplierName = col(row, 'supplier') || 'Unassigned'
 
