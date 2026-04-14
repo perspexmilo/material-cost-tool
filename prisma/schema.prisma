@@ -123,6 +123,7 @@ model CompetitorBasketItem {
   heightMm    Int      @map("height_mm")
   thicknessMm Decimal  @map("thickness_mm") @db.Decimal(6, 2)
   colour      String?
+  materialRef String?  @map("material_ref")
   active      Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at")
 
