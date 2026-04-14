@@ -1,4 +1,4 @@
-# 🔍 Peeping Tom
+# Material Cost Tracking
 
 > Keeping an eye on competitor prices so you don't have to.
 
@@ -7,8 +7,6 @@ Internal tooling for [Cut My](https://www.cutmy.co.uk) — a material cost track
 ---
 
 ## What it does
-
-**Peeping Tom** is two things in one repo:
 
 ### 1. Material Cost Database
 Track Cut My's own material costs, markup multipliers, and retail prices across the full product range. Import supplier price lists from PDFs and emails using AI parsing — no manual data entry.
