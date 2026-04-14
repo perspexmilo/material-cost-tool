@@ -216,7 +216,7 @@ export function MaterialsTable({ initialData, initialTotal, filters: externalFil
       if (!res.ok) throw new Error('Failed to fetch filter options')
       return res.json()
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   })
 
   const categories  = filterOptions?.categories ?? [...new Set(allMaterials.map((m) => m.category))].sort()
