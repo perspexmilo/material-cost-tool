@@ -67,7 +67,7 @@ function Delta({ current, previous }: { current: number | null; previous: number
   const Icon = up ? TrendingUp : TrendingDown
 
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${colour} mt-0.5`}>
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${colour} mt-0.5 whitespace-nowrap`}>
       <Icon size={10} />
       {up ? '+' : ''}£{Math.abs(diff).toFixed(2)}
       <span className="opacity-70">({up ? '+' : ''}{pct.toFixed(1)}%)</span>
