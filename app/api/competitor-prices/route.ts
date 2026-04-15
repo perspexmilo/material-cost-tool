@@ -13,15 +13,17 @@ const PLASTIC_COMPETITORS = [
   'plastic-sheets',
 ] as const
 
+// mdf-direct, ply-direct, and mfc-direct are all the same company (MDF/Ply/MFC Direct).
+// Each sub-site only stocks its own product type so they never overlap — we merge them
+// into a single column, coalescing to whichever slug has a non-null price per item.
+const MDF_PLY_MFC_SLUGS = ['mdf-direct', 'ply-direct', 'mfc-direct'] as const
+
 const WOOD_COMPETITORS = [
-  'mdf-direct',
   'wood-sheets',
   'cnc-creations',
   'plastic-people-mdf',
   'cut-plastic-sheeting-mdf',
   'just-mdf',
-  'ply-direct',
-  'mfc-direct',
 ] as const
 
 const COMPETITOR_LABELS: Record<string, string> = {
@@ -31,14 +33,11 @@ const COMPETITOR_LABELS: Record<string, string> = {
   'sheet-plastics':       'Sheet Plastics',
   'plastic-sheet-shop':   'Plastic Sheet Shop',
   'plastic-sheets':       'Plastic Sheets',
-  'mdf-direct':           'MDF Direct',
   'wood-sheets':          'Wood Sheets',
   'cnc-creations':        'CNC Creations',
   'plastic-people-mdf':         'Plastic People',
   'cut-plastic-sheeting-mdf':   'Cut Plastic Sheeting',
   'just-mdf':                   'Just MDF',
-  'ply-direct':                 'Ply Direct',
-  'mfc-direct':                 'MFC Direct',
 }
 
 export async function GET(req: NextRequest) {
@@ -57,48 +56,89 @@ export async function GET(req: NextRequest) {
     // For each competitor, get the latest AND second-latest price per basket item.
     // We use a window function so partial scrapes (e.g. --colour Black only) don't
     // wipe out Clear prices — each item independently tracks its own history.
+    const fetchSlug = async (slug: string) => {
+      const rows = await prisma.$queryRaw<Array<{
+        basket_item_id: string
+        price_per_m2: string | null
+        raw_value: string | null
+        run_at: Date
+        rn: bigint
+      }>>`
+        WITH ranked AS (
+          SELECT
+            cp.basket_item_id,
+            cp.price_per_m2,
+            cp.raw_value,
+            cr.run_at,
+            ROW_NUMBER() OVER (
+              PARTITION BY cp.basket_item_id
+              ORDER BY cr.run_at DESC
+            ) AS rn
+          FROM competitor_prices cp
+          JOIN competitor_runs cr ON cp.run_id = cr.id
+          WHERE cr.competitor = ${slug}
+            AND cr.status IN ('success', 'partial')
+        )
+        SELECT * FROM ranked WHERE rn <= 2
+        ORDER BY basket_item_id, rn
+      `
+      const currentByItem: Record<string, (typeof rows)[0]> = {}
+      const previousByItem: Record<string, (typeof rows)[0]> = {}
+      for (const row of rows) {
+        if (Number(row.rn) === 1) currentByItem[row.basket_item_id] = row
+        else if (Number(row.rn) === 2) previousByItem[row.basket_item_id] = row
+      }
+      const latestRunAt = rows
+        .filter((r) => Number(r.rn) === 1)
+        .reduce<Date | null>((max, r) => (!max || r.run_at > max ? r.run_at : max), null)
+      return { slug, currentByItem, previousByItem, latestRunAt }
+    }
+
     const competitorData = await Promise.all(
       COMPETITORS.map(async (slug) => {
-        const rows = await prisma.$queryRaw<Array<{
-          basket_item_id: string
-          price_per_m2: string | null
-          raw_value: string | null
-          run_at: Date
-          rn: bigint
-        }>>`
-          WITH ranked AS (
-            SELECT
-              cp.basket_item_id,
-              cp.price_per_m2,
-              cp.raw_value,
-              cr.run_at,
-              ROW_NUMBER() OVER (
-                PARTITION BY cp.basket_item_id
-                ORDER BY cr.run_at DESC
-              ) AS rn
-            FROM competitor_prices cp
-            JOIN competitor_runs cr ON cp.run_id = cr.id
-            WHERE cr.competitor = ${slug}
-              AND cr.status IN ('success', 'partial')
-          )
-          SELECT * FROM ranked WHERE rn <= 2
-          ORDER BY basket_item_id, rn
-        `
-
-        const currentByItem: Record<string, (typeof rows)[0]> = {}
-        const previousByItem: Record<string, (typeof rows)[0]> = {}
-        for (const row of rows) {
-          if (Number(row.rn) === 1) currentByItem[row.basket_item_id] = row
-          else if (Number(row.rn) === 2) previousByItem[row.basket_item_id] = row
-        }
-        // Use the most recent run_at across all rn=1 rows as the display timestamp
-        const latestRunAt = rows
-          .filter((r) => Number(r.rn) === 1)
-          .reduce<Date | null>((max, r) => (!max || r.run_at > max ? r.run_at : max), null)
-
-        return { slug, label: COMPETITOR_LABELS[slug], currentByItem, previousByItem, latestRunAt }
+        const d = await fetchSlug(slug)
+        return { slug, label: COMPETITOR_LABELS[slug], ...d }
       })
     )
+
+    // Merge mdf-direct + ply-direct + mfc-direct into one column.
+    // Since they never stock the same products, each item will have at most one non-null price.
+    if (category === 'wood') {
+      const [mdfData, plyData, mfcData] = await Promise.all(
+        MDF_PLY_MFC_SLUGS.map(fetchSlug)
+      )
+      const mergedCurrentByItem: typeof mdfData.currentByItem = {}
+      const mergedPreviousByItem: typeof mdfData.previousByItem = {}
+      for (const itemId of Object.keys({
+        ...mdfData.currentByItem,
+        ...plyData.currentByItem,
+        ...mfcData.currentByItem,
+      })) {
+        const cur =
+          (mdfData.currentByItem[itemId]?.price_per_m2 != null ? mdfData.currentByItem[itemId] : null) ??
+          (plyData.currentByItem[itemId]?.price_per_m2 != null ? plyData.currentByItem[itemId] : null) ??
+          mfcData.currentByItem[itemId] ??
+          undefined
+        if (cur) mergedCurrentByItem[itemId] = cur
+        const prev =
+          (mdfData.previousByItem[itemId]?.price_per_m2 != null ? mdfData.previousByItem[itemId] : null) ??
+          (plyData.previousByItem[itemId]?.price_per_m2 != null ? plyData.previousByItem[itemId] : null) ??
+          mfcData.previousByItem[itemId] ??
+          undefined
+        if (prev) mergedPreviousByItem[itemId] = prev
+      }
+      const mergedRunAt = [mdfData.latestRunAt, plyData.latestRunAt, mfcData.latestRunAt]
+        .filter((d): d is Date => d !== null)
+        .reduce<Date | null>((max, d) => (!max || d > max ? d : max), null)
+
+      competitorData.push({
+        slug: 'mdf-ply-mfc-direct',
+        label: 'MDF/Ply/MFC Direct',
+        currentByItem: mergedCurrentByItem,
+        previousByItem: mergedPreviousByItem,
+        latestRunAt: mergedRunAt,
+      })
+    }
 
     // Batch-fetch all mapped Cut My materials in one query, then look up in memory
     const mappedEntityIds = basketItems
