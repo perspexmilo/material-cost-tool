@@ -78,6 +78,7 @@ export async function GET(req: NextRequest) {
           JOIN competitor_runs cr ON cp.run_id = cr.id
           WHERE cr.competitor = ${slug}
             AND cr.status IN ('success', 'partial')
+            AND cp.price_per_m2 IS NOT NULL
         )
         SELECT * FROM ranked WHERE rn <= 2
         ORDER BY basket_item_id, rn
