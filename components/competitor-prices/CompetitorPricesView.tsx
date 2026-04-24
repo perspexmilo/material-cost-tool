@@ -440,7 +440,10 @@ export function CompetitorPricesView({ category }: Props) {
                   ? applyDiscount(cutMyPrice, discountMap['cut-my'] ?? 0)
                   : cutMyPrice
                 const competitorPrices = data.competitors
-                  .map(c => c.prices.find(p => p.basketItemId === item.id)?.pricePerM2 ?? null)
+                  .map(c => {
+                    const raw = c.prices.find(p => p.basketItemId === item.id)?.pricePerM2 ?? null
+                    return discountsOn ? applyDiscount(raw, discountMap[c.slug] ?? 0) : raw
+                  })
                   .filter((p): p is number => p !== null)
                 const avgPrice = competitorPrices.length
                   ? competitorPrices.reduce((a, b) => a + b, 0) / competitorPrices.length
