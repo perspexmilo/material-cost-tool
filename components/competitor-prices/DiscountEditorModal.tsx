@@ -18,6 +18,22 @@ interface Props {
 const PLASTIC_SLUGS = ['cut-my', 'simply-plastics', 'plastic-people', 'cut-plastic-sheeting', 'sheet-plastics', 'plastic-sheet-shop', 'plastic-sheets']
 const WOOD_SLUGS    = ['cut-my', 'wood-sheets', 'cnc-creations', 'plastic-people-mdf', 'cut-plastic-sheeting-mdf', 'just-mdf', 'mdf-ply-mfc-direct']
 
+const SLUG_LABELS: Record<string, string> = {
+  'cut-my':                  'Cut My',
+  'simply-plastics':         'Simply Plastics',
+  'plastic-people':          'Plastic People',
+  'cut-plastic-sheeting':    'Cut Plastic Sheeting',
+  'sheet-plastics':          'Sheet Plastics',
+  'plastic-sheet-shop':      'Plastic Sheet Shop',
+  'plastic-sheets':          'Plastic Sheets',
+  'wood-sheets':             'Wood Sheets',
+  'cnc-creations':           'CNC Creations',
+  'plastic-people-mdf':      'Plastic People (MDF)',
+  'cut-plastic-sheeting-mdf':'Cut Plastic Sheeting (MDF)',
+  'just-mdf':                'Just MDF',
+  'mdf-ply-mfc-direct':      'MDF Ply MFC Direct',
+}
+
 export function DiscountEditorModal({ category, onClose }: Props) {
   const queryClient = useQueryClient()
 
@@ -28,17 +44,15 @@ export function DiscountEditorModal({ category, onClose }: Props) {
   })
 
   const slugs = category === 'wood' ? WOOD_SLUGS : PLASTIC_SLUGS
-  const relevant = slugs
-    .map(slug => settings.find(s => s.slug === slug))
-    .filter(Boolean) as DiscountSetting[]
+  const relevant: DiscountSetting[] = slugs.map(slug => {
+    const found = settings.find(s => s.slug === slug)
+    return found ?? { slug, label: SLUG_LABELS[slug] ?? slug, discountPct: 0 }
+  })
 
   const [localValues, setLocalValues] = useState<Record<string, string>>({})
 
-  // Sync local input values once settings load
   useEffect(() => {
-    if (relevant.length > 0) {
-      setLocalValues(Object.fromEntries(relevant.map(s => [s.slug, String(s.discountPct)])))
-    }
+    setLocalValues(Object.fromEntries(relevant.map(s => [s.slug, String(s.discountPct)])))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings])
 

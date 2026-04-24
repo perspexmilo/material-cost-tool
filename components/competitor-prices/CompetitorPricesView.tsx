@@ -319,26 +319,6 @@ export function CompetitorPricesView({ category }: Props) {
             £/m² inc VAT · 1000 × 1000mm · delta vs previous week
             {discountsOn && <span className="ml-1.5 text-[#009FE3] font-medium">· discounts applied</span>}
           </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleDiscounts}
-              className={[
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[12px] font-medium transition-colors',
-                discountsOn
-                  ? 'bg-[#009FE3] border-[#009FE3] text-white'
-                  : 'bg-white border-[#E5E5E3] text-gray-600 hover:bg-gray-50',
-              ].join(' ')}
-            >
-              % Discounts {discountsOn ? 'on' : 'off'}
-            </button>
-            <button
-              onClick={() => setShowDiscountEditor(true)}
-              className="p-1.5 rounded-lg border border-[#E5E5E3] text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors bg-white"
-              title="Edit discount percentages"
-            >
-              <Settings2 size={13} />
-            </button>
-          </div>
           <button
             onClick={() => refetch()}
             disabled={isFetching}
@@ -387,6 +367,27 @@ export function CompetitorPricesView({ category }: Props) {
               <X size={12} /> Clear filters
             </button>
           )}
+
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={toggleDiscounts}
+              className={[
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[12px] font-medium transition-colors',
+                discountsOn
+                  ? 'bg-[#009FE3] border-[#009FE3] text-white'
+                  : 'bg-white border-[#E5E5E3] text-gray-600 hover:bg-gray-50',
+              ].join(' ')}
+            >
+              % Discounts {discountsOn ? 'on' : 'off'}
+            </button>
+            <button
+              onClick={() => setShowDiscountEditor(true)}
+              className="p-1.5 rounded-lg border border-[#E5E5E3] text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors bg-white"
+              title="Edit discount percentages"
+            >
+              <Settings2 size={13} />
+            </button>
+          </div>
         </div>
       </div>
 
