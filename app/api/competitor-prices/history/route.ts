@@ -48,7 +48,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'basketItemId required' }, { status: 400 })
   }
 
-  const magentoEntityId = req.nextUrl.searchParams.get('magentoEntityId')
   const allowedSlugs = category === 'wood' ? WOOD_SLUGS : PLASTIC_SLUGS
 
   // One price per competitor per day — latest run if multiple happened same day
@@ -101,53 +100,11 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // Cut My price history — only available when a variant is mapped
-  let cutMyPoints: { date: number; pricePerM2: number }[] = []
-  if (magentoEntityId) {
-    const material = await prisma.material.findUnique({
-      where: { magentoEntityId: Number(magentoEntityId) },
-      select: {
-        id: true,
-        widthMm: true,
-        heightMm: true,
-        markupMultiplier: true,
-        costPerSheet: true,
-        lastUpdatedAt: true,
-        costHistory: {
-          orderBy: { changedAt: 'asc' },
-          select: { newCost: true, changedAt: true, effectiveDate: true },
-        },
-      },
-    })
-
-    if (material?.markupMultiplier) {
-      const sheetAreaM2 =
-        (Number(material.widthMm) * Number(material.heightMm)) / 1_000_000
-      const multiplier = Number(material.markupMultiplier)
-
-      if (sheetAreaM2 > 0) {
-        if (material.costHistory.length > 0) {
-          cutMyPoints = material.costHistory.map(h => ({
-            date: new Date(h.effectiveDate ?? h.changedAt).getTime(),
-            pricePerM2: (Number(h.newCost) * multiplier) / sheetAreaM2,
-          }))
-        } else {
-          // Material has never had a cost change recorded — show the current price
-          cutMyPoints = [{
-            date: new Date(material.lastUpdatedAt).getTime(),
-            pricePerM2: (Number(material.costPerSheet) * multiplier) / sheetAreaM2,
-          }]
-        }
-      }
-    }
-  }
-
   return NextResponse.json({
     competitors: Array.from(grouped.entries()).map(([slug, { label, points }]) => ({
       slug,
       label,
       points,
     })),
-    cutMyPoints,
   })
 }

@@ -20,7 +20,6 @@ interface BasketItem {
   name: string
   widthMm: number
   heightMm: number
-  magentoEntityId: number | null
 }
 
 interface HistoryPoint {
@@ -36,7 +35,6 @@ interface CompetitorHistory {
 
 interface ApiResponse {
   competitors: CompetitorHistory[]
-  cutMyPoints: HistoryPoint[]
 }
 
 const LINE_COLORS = [
@@ -49,14 +47,11 @@ const LINE_COLORS = [
   '#06B6D4',
 ]
 
-const CUTMY_COLOR = '#2DBDAA'
+const CUTMY_COLOR = '#009FE3'
 
-function buildChartData(competitors: CompetitorHistory[], cutMyPoints: HistoryPoint[]) {
+function buildChartData(competitors: CompetitorHistory[], cutMyPrice: number | null) {
   const allDates = Array.from(
-    new Set([
-      ...competitors.flatMap(c => c.points.map(p => p.date)),
-      ...cutMyPoints.map(p => p.date),
-    ])
+    new Set(competitors.flatMap(c => c.points.map(p => p.date)))
   ).sort((a, b) => a - b)
 
   return allDates.map(date => {
@@ -65,8 +60,8 @@ function buildChartData(competitors: CompetitorHistory[], cutMyPoints: HistoryPo
       const match = c.points.find(p => p.date === date)
       point[c.slug] = match?.pricePerM2 ?? null
     }
-    const cutMyMatch = cutMyPoints.find(p => p.date === date)
-    point['__cutmy'] = cutMyMatch?.pricePerM2 ?? null
+    // Flat line at the current Cut My price across all competitor dates
+    if (cutMyPrice != null) point['__cutmy'] = cutMyPrice
     return point
   })
 }
@@ -74,17 +69,16 @@ function buildChartData(competitors: CompetitorHistory[], cutMyPoints: HistoryPo
 interface Props {
   item: BasketItem
   category: 'plastic' | 'wood'
+  cutMyPrice: number | null
   onClose: () => void
 }
 
-export function CompetitorPriceHistoryModal({ item, category, onClose }: Props) {
+export function CompetitorPriceHistoryModal({ item, category, cutMyPrice, onClose }: Props) {
   const { data, isLoading, isError } = useQuery<ApiResponse>({
     queryKey: ['competitor-price-history', item.id],
-    queryFn: () => {
-      const params = new URLSearchParams({ basketItemId: item.id, category })
-      if (item.magentoEntityId) params.set('magentoEntityId', String(item.magentoEntityId))
-      return fetch(`/api/competitor-prices/history?${params}`).then(r => r.json())
-    },
+    queryFn: () =>
+      fetch(`/api/competitor-prices/history?basketItemId=${item.id}&category=${category}`)
+        .then(r => r.json()),
     staleTime: 5 * 60 * 1000,
   })
 
@@ -98,12 +92,11 @@ export function CompetitorPriceHistoryModal({ item, category, onClose }: Props) 
   }, [handleKeyDown])
 
   const competitors = data?.competitors ?? []
-  const cutMyPoints = data?.cutMyPoints ?? []
-  const chartData = buildChartData(competitors, cutMyPoints)
+  const chartData = buildChartData(competitors, cutMyPrice)
 
   const allPrices = [
     ...competitors.flatMap(c => c.points.map(p => p.pricePerM2)),
-    ...cutMyPoints.map(p => p.pricePerM2),
+    ...(cutMyPrice != null ? [cutMyPrice] : []),
   ]
   const minPrice = allPrices.length ? Math.min(...allPrices) : 0
   const maxPrice = allPrices.length ? Math.max(...allPrices) : 100
@@ -121,7 +114,7 @@ export function CompetitorPriceHistoryModal({ item, category, onClose }: Props) 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5E5E3]">
           <div className="flex items-center gap-2">
-            <div className="w-[3px] h-4 rounded-full bg-[#2DBDAA]" />
+            <div className="w-[3px] h-4 rounded-full" style={{ backgroundColor: CUTMY_COLOR }} />
             <div>
               <p className="text-[12px] font-semibold text-gray-500 uppercase tracking-widest">
                 Competitor Price History
@@ -236,7 +229,7 @@ export function CompetitorPriceHistoryModal({ item, category, onClose }: Props) 
                     connectNulls={false}
                   />
                 ))}
-                {cutMyPoints.length > 0 && (
+                {cutMyPrice != null && (
                   <Line
                     type="monotone"
                     dataKey="__cutmy"
@@ -244,9 +237,8 @@ export function CompetitorPriceHistoryModal({ item, category, onClose }: Props) 
                     stroke={CUTMY_COLOR}
                     strokeWidth={2.5}
                     strokeDasharray="5 3"
-                    dot={{ r: 3, strokeWidth: 0, fill: CUTMY_COLOR }}
-                    activeDot={{ r: 4, strokeWidth: 0 }}
-                    connectNulls={false}
+                    dot={false}
+                    activeDot={{ r: 4, strokeWidth: 0, fill: CUTMY_COLOR }}
                   />
                 )}
               </LineChart>

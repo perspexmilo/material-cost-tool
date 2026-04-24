@@ -436,6 +436,7 @@ export function CompetitorPricesView({ category }: Props) {
         <CompetitorPriceHistoryModal
           item={historyItem}
           category={category}
+          cutMyPrice={data ? (data.cutMyPrices[historyItem.id] ?? null) : null}
           onClose={() => setHistoryItem(null)}
         />
       )}
