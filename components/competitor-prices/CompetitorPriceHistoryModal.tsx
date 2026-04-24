@@ -37,17 +37,28 @@ interface ApiResponse {
   competitors: CompetitorHistory[]
 }
 
-const LINE_COLORS = [
-  '#6366F1',
-  '#F59E0B',
-  '#EF4444',
-  '#10B981',
-  '#8B5CF6',
-  '#F97316',
-  '#06B6D4',
-]
+const SLUG_COLORS: Record<string, string> = {
+  // Plastic
+  'simply-plastics':        '#F97316',
+  'plastic-people':         '#6366F1',
+  'cut-plastic-sheeting':   '#8B5CF6',
+  'sheet-plastics':         '#10B981',
+  'plastic-sheet-shop':     '#EF4444',
+  'plastic-sheets':         '#F59E0B',
+  // Wood
+  'wood-sheets':            '#6366F1',
+  'cnc-creations':          '#F59E0B',
+  'plastic-people-mdf':     '#8B5CF6',
+  'cut-plastic-sheeting-mdf': '#EF4444',
+  'just-mdf':               '#10B981',
+  'mdf-ply-mfc-direct':     '#F97316',
+}
 
 const CUTMY_COLOR = '#009FE3'
+
+function slugColor(slug: string): string {
+  return SLUG_COLORS[slug] ?? '#9CA3AF'
+}
 
 function buildChartData(competitors: CompetitorHistory[], cutMyPrice: number | null) {
   const allDates = Array.from(
@@ -216,15 +227,15 @@ export function CompetitorPriceHistoryModal({ item, category, cutMyPrice, onClos
                   iconSize={7}
                   wrapperStyle={{ fontSize: '11px', paddingTop: '12px' }}
                 />
-                {competitors.map((c, i) => (
+                {competitors.map((c) => (
                   <Line
                     key={c.slug}
                     type="monotone"
                     dataKey={c.slug}
                     name={c.label}
-                    stroke={LINE_COLORS[i % LINE_COLORS.length]}
+                    stroke={slugColor(c.slug)}
                     strokeWidth={2}
-                    dot={{ r: 3, strokeWidth: 0, fill: LINE_COLORS[i % LINE_COLORS.length] }}
+                    dot={{ r: 3, strokeWidth: 0, fill: slugColor(c.slug) }}
                     activeDot={{ r: 4, strokeWidth: 0 }}
                     connectNulls={false}
                   />
