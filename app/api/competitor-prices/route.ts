@@ -72,9 +72,15 @@ export async function GET(req: NextRequest) {
             cp.raw_value,
             cp.url,
             cr.run_at,
+            -- latest run within each calendar week
             ROW_NUMBER() OVER (
-              PARTITION BY cp.basket_item_id
+              PARTITION BY cp.basket_item_id, DATE_TRUNC('week', cr.run_at)
               ORDER BY cr.run_at DESC
+            ) AS rn_within_week,
+            -- week rank: 1 = most recent week, 2 = week before, etc.
+            DENSE_RANK() OVER (
+              PARTITION BY cp.basket_item_id
+              ORDER BY DATE_TRUNC('week', cr.run_at) DESC
             ) AS rn
           FROM competitor_prices cp
           JOIN competitor_runs cr ON cp.run_id = cr.id
@@ -82,7 +88,9 @@ export async function GET(req: NextRequest) {
             AND cr.status IN ('success', 'partial')
             AND cp.price_per_m2 IS NOT NULL
         )
-        SELECT * FROM ranked WHERE rn <= 2
+        SELECT basket_item_id, price_per_m2, raw_value, url, run_at, rn
+        FROM ranked
+        WHERE rn_within_week = 1 AND rn <= 2
         ORDER BY basket_item_id, rn
       `
       const currentByItem: Record<string, (typeof rows)[0]> = {}
