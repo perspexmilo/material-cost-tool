@@ -250,7 +250,7 @@ export function CompetitorPricesView({ category }: Props) {
   const { data: discountSettings = [] } = useQuery<DiscountSetting[]>({
     queryKey: ['discount-settings'],
     queryFn: () => fetch('/api/discount-settings').then(r => r.json()),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   })
   const discountMap = useMemo(
     () => Object.fromEntries(discountSettings.map(s => [s.slug, Number(s.discountPct)])),
@@ -473,7 +473,7 @@ export function CompetitorPricesView({ category }: Props) {
                         <div className="text-[10px] text-amber-500 mt-0.5">No Cut My variant mapped</div>
                       )}
                     </td>
-                    <PriceCell cutMyPrice={effectiveCutMyPrice} isCutMy discountPct={discountsOn ? (discountMap['cut-my'] ?? 0) : 0} />
+                    <PriceCell cutMyPrice={cutMyPrice} isCutMy discountPct={discountsOn ? (discountMap['cut-my'] ?? 0) : 0} />
                     <td className="px-4 py-3 text-right text-sm font-mono tabular-nums text-gray-500 bg-gray-50/40">
                       {fmt(avgPrice)}
                     </td>
