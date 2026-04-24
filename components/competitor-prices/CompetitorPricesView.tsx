@@ -5,6 +5,7 @@ import { RefreshCw, TrendingUp, TrendingDown, Pencil, X, Check, ExternalLink } f
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { CompetitorPriceHistoryModal } from './CompetitorPriceHistoryModal'
+import { SLUG_HOMEPAGES } from '@/lib/competitor-homepages'
 
 interface BasketItem {
   id: string
@@ -355,7 +356,21 @@ export function CompetitorPricesView({ category }: Props) {
                 </th>
                 {data.competitors.map(c => (
                   <th key={c.slug} className="px-4 py-3 text-right font-semibold text-gray-600 text-xs uppercase tracking-wider w-[140px] min-w-[140px] bg-gray-50">
-                    <div>{c.label}</div>
+                    <div className="flex items-center justify-end gap-1">
+                      <span>{c.label}</span>
+                      {SLUG_HOMEPAGES[c.slug] && (
+                        <a
+                          href={SLUG_HOMEPAGES[c.slug]}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          className="text-gray-300 hover:text-gray-500 transition-colors"
+                          title={`Visit ${c.label}`}
+                        >
+                          <ExternalLink size={10} />
+                        </a>
+                      )}
+                    </div>
                     <div className="text-[10px] font-normal text-gray-400 normal-case mt-0.5">{fmtDate(c.runAt)}</div>
                   </th>
                 ))}
