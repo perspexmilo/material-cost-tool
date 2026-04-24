@@ -12,8 +12,32 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  const { slug, discountPct } = await req.json()
+  const body = await req.json()
 
+  // Batch: array of { slug, label, discountPct }
+  if (Array.isArray(body)) {
+    for (const item of body) {
+      if (typeof item.slug !== 'string' || typeof item.discountPct !== 'number') {
+        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
+      }
+      if (item.discountPct < 0 || item.discountPct > 100) {
+        return NextResponse.json({ error: 'discountPct must be 0–100' }, { status: 400 })
+      }
+    }
+    await Promise.all(
+      body.map((item: { slug: string; label: string; discountPct: number }) =>
+        prisma.discountSetting.upsert({
+          where: { slug: item.slug },
+          update: { discountPct: item.discountPct },
+          create: { slug: item.slug, label: item.label, discountPct: item.discountPct },
+        })
+      )
+    )
+    return NextResponse.json({ ok: true })
+  }
+
+  // Single: { slug, label?, discountPct }
+  const { slug, discountPct, label } = body
   if (typeof slug !== 'string' || typeof discountPct !== 'number') {
     return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
   }
@@ -24,7 +48,7 @@ export async function PATCH(req: NextRequest) {
   const setting = await prisma.discountSetting.upsert({
     where: { slug },
     update: { discountPct },
-    create: { slug, label: slug, discountPct },
+    create: { slug, label: label ?? slug, discountPct },
   })
   return NextResponse.json(setting)
 }

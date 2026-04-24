@@ -1,7 +1,7 @@
 'use client'
 
 import { X } from 'lucide-react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useRef } from 'react'
 
 interface DiscountSetting {
@@ -19,19 +19,19 @@ const PLASTIC_SLUGS = ['cut-my', 'simply-plastics', 'plastic-people', 'cut-plast
 const WOOD_SLUGS    = ['cut-my', 'wood-sheets', 'cnc-creations', 'plastic-people-mdf', 'cut-plastic-sheeting-mdf', 'just-mdf', 'mdf-ply-mfc-direct']
 
 const SLUG_LABELS: Record<string, string> = {
-  'cut-my':                  'Cut My',
-  'simply-plastics':         'Simply Plastics',
-  'plastic-people':          'Plastic People',
-  'cut-plastic-sheeting':    'Cut Plastic Sheeting',
-  'sheet-plastics':          'Sheet Plastics',
-  'plastic-sheet-shop':      'Plastic Sheet Shop',
-  'plastic-sheets':          'Plastic Sheets',
-  'wood-sheets':             'Wood Sheets',
-  'cnc-creations':           'CNC Creations',
-  'plastic-people-mdf':      'Plastic People (MDF)',
-  'cut-plastic-sheeting-mdf':'Cut Plastic Sheeting (MDF)',
-  'just-mdf':                'Just MDF',
-  'mdf-ply-mfc-direct':      'MDF Ply MFC Direct',
+  'cut-my':                   'Cut My',
+  'simply-plastics':          'Simply Plastics',
+  'plastic-people':           'Plastic People',
+  'cut-plastic-sheeting':     'Cut Plastic Sheeting',
+  'sheet-plastics':           'Sheet Plastics',
+  'plastic-sheet-shop':       'Plastic Sheet Shop',
+  'plastic-sheets':           'Plastic Sheets',
+  'wood-sheets':              'Wood Sheets',
+  'cnc-creations':            'CNC Creations',
+  'plastic-people-mdf':       'Plastic People (MDF)',
+  'cut-plastic-sheeting-mdf': 'Cut Plastic Sheeting (MDF)',
+  'just-mdf':                 'Just MDF',
+  'mdf-ply-mfc-direct':       'MDF Ply MFC Direct',
 }
 
 export function DiscountEditorModal({ category, onClose }: Props) {
@@ -40,7 +40,7 @@ export function DiscountEditorModal({ category, onClose }: Props) {
   const { data: settings = [], isLoading } = useQuery<DiscountSetting[]>({
     queryKey: ['discount-settings'],
     queryFn: () => fetch('/api/discount-settings').then(r => r.json()),
-    staleTime: Infinity,
+    staleTime: 0,
     refetchOnWindowFocus: false,
   })
 
@@ -51,30 +51,32 @@ export function DiscountEditorModal({ category, onClose }: Props) {
   })
 
   const [localValues, setLocalValues] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
   const initialised = useRef(false)
 
   useEffect(() => {
     if (initialised.current) return
+    if (isLoading) return
     initialised.current = true
-    setLocalValues(Object.fromEntries(relevant.map(s => [s.slug, String(s.discountPct)])))
+    setLocalValues(Object.fromEntries(relevant.map(s => [s.slug, String(Number(s.discountPct))])))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings])
+  }, [isLoading, settings])
 
-  const mutation = useMutation({
-    mutationFn: ({ slug, discountPct }: { slug: string; discountPct: number }) =>
-      fetch('/api/discount-settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, discountPct }),
-      }).then(r => r.json()),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['discount-settings'] }),
-  })
-
-  function handleBlur(slug: string) {
-    const raw = localValues[slug] ?? '0'
-    const parsed = Math.min(100, Math.max(0, parseFloat(raw) || 0))
-    setLocalValues(v => ({ ...v, [slug]: String(parsed) }))
-    mutation.mutate({ slug, discountPct: parsed })
+  async function handleSave() {
+    setSaving(true)
+    const items = relevant.map(s => {
+      const raw = localValues[s.slug] ?? '0'
+      const discountPct = Math.min(100, Math.max(0, parseFloat(raw) || 0))
+      return { slug: s.slug, label: s.label, discountPct }
+    })
+    await fetch('/api/discount-settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(items),
+    })
+    await queryClient.invalidateQueries({ queryKey: ['discount-settings'] })
+    setSaving(false)
+    onClose()
   }
 
   return (
@@ -121,7 +123,6 @@ export function DiscountEditorModal({ category, onClose }: Props) {
                       step="0.5"
                       value={localValues[s.slug] ?? '0'}
                       onChange={e => setLocalValues(v => ({ ...v, [s.slug]: e.target.value }))}
-                      onBlur={() => handleBlur(s.slug)}
                       className="w-16 text-right text-sm px-2 py-1 rounded-lg border border-[#E5E5E3] focus:outline-none focus:ring-2 focus:ring-[#2DBDAA]/40 focus:border-[#2DBDAA] tabular-nums"
                     />
                     <span className="text-sm text-gray-400">%</span>
@@ -132,9 +133,20 @@ export function DiscountEditorModal({ category, onClose }: Props) {
           </div>
         )}
 
-        <div className="px-5 py-3 bg-gray-50 border-t border-[#E5E5E3] text-xs text-gray-400">
-          Changes save automatically on blur
-          {mutation.isPending && <span className="ml-2 text-[#2DBDAA]">Saving…</span>}
+        <div className="px-5 py-3 bg-gray-50 border-t border-[#E5E5E3] flex items-center justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || isLoading}
+            className="px-4 py-1.5 text-sm font-medium rounded-lg bg-[#2DBDAA] text-white hover:bg-[#28a898] disabled:opacity-50 transition-colors"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
         </div>
       </div>
     </div>
