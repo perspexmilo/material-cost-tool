@@ -20,6 +20,7 @@ interface BasketItem {
   name: string
   widthMm: number
   heightMm: number
+  magentoEntityId: number | null
 }
 
 interface HistoryPoint {
@@ -35,6 +36,7 @@ interface CompetitorHistory {
 
 interface ApiResponse {
   competitors: CompetitorHistory[]
+  cutMyPoints: HistoryPoint[]
 }
 
 const LINE_COLORS = [
@@ -47,9 +49,14 @@ const LINE_COLORS = [
   '#06B6D4',
 ]
 
-function buildChartData(competitors: CompetitorHistory[]) {
+const CUTMY_COLOR = '#2DBDAA'
+
+function buildChartData(competitors: CompetitorHistory[], cutMyPoints: HistoryPoint[]) {
   const allDates = Array.from(
-    new Set(competitors.flatMap(c => c.points.map(p => p.date)))
+    new Set([
+      ...competitors.flatMap(c => c.points.map(p => p.date)),
+      ...cutMyPoints.map(p => p.date),
+    ])
   ).sort((a, b) => a - b)
 
   return allDates.map(date => {
@@ -58,6 +65,8 @@ function buildChartData(competitors: CompetitorHistory[]) {
       const match = c.points.find(p => p.date === date)
       point[c.slug] = match?.pricePerM2 ?? null
     }
+    const cutMyMatch = cutMyPoints.find(p => p.date === date)
+    point['__cutmy'] = cutMyMatch?.pricePerM2 ?? null
     return point
   })
 }
@@ -71,9 +80,11 @@ interface Props {
 export function CompetitorPriceHistoryModal({ item, category, onClose }: Props) {
   const { data, isLoading, isError } = useQuery<ApiResponse>({
     queryKey: ['competitor-price-history', item.id],
-    queryFn: () =>
-      fetch(`/api/competitor-prices/history?basketItemId=${item.id}&category=${category}`)
-        .then(r => r.json()),
+    queryFn: () => {
+      const params = new URLSearchParams({ basketItemId: item.id, category })
+      if (item.magentoEntityId) params.set('magentoEntityId', String(item.magentoEntityId))
+      return fetch(`/api/competitor-prices/history?${params}`).then(r => r.json())
+    },
     staleTime: 5 * 60 * 1000,
   })
 
@@ -87,9 +98,13 @@ export function CompetitorPriceHistoryModal({ item, category, onClose }: Props) 
   }, [handleKeyDown])
 
   const competitors = data?.competitors ?? []
-  const chartData = buildChartData(competitors)
+  const cutMyPoints = data?.cutMyPoints ?? []
+  const chartData = buildChartData(competitors, cutMyPoints)
 
-  const allPrices = competitors.flatMap(c => c.points.map(p => p.pricePerM2))
+  const allPrices = [
+    ...competitors.flatMap(c => c.points.map(p => p.pricePerM2)),
+    ...cutMyPoints.map(p => p.pricePerM2),
+  ]
   const minPrice = allPrices.length ? Math.min(...allPrices) : 0
   const maxPrice = allPrices.length ? Math.max(...allPrices) : 100
   const pad = (maxPrice - minPrice) * 0.15 || maxPrice * 0.1
@@ -221,6 +236,19 @@ export function CompetitorPriceHistoryModal({ item, category, onClose }: Props) 
                     connectNulls={false}
                   />
                 ))}
+                {cutMyPoints.length > 0 && (
+                  <Line
+                    type="monotone"
+                    dataKey="__cutmy"
+                    name="Cut My"
+                    stroke={CUTMY_COLOR}
+                    strokeWidth={2.5}
+                    strokeDasharray="5 3"
+                    dot={{ r: 3, strokeWidth: 0, fill: CUTMY_COLOR }}
+                    activeDot={{ r: 4, strokeWidth: 0 }}
+                    connectNulls={false}
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           )}
