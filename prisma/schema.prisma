@@ -112,6 +112,14 @@ model ParserContext {
   @@map("parser_context")
 }
 
+model DiscountSetting {
+  slug        String  @id           // e.g. "cut-my", "simply-plastics"
+  label       String                // display name
+  discountPct Decimal @default(0) @map("discount_pct") @db.Decimal(5, 2)
+
+  @@map("discount_settings")
+}
+
 // ─── Competitor Price Monitor ────────────────────────────────────────────────
 
 model CompetitorBasketItem {

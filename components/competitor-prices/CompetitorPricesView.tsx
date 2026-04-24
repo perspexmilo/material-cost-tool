@@ -1,11 +1,18 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { RefreshCw, TrendingUp, TrendingDown, Pencil, X, Check, ExternalLink } from 'lucide-react'
+import { RefreshCw, TrendingUp, TrendingDown, Pencil, X, Check, ExternalLink, Settings2 } from 'lucide-react'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { CompetitorPriceHistoryModal } from './CompetitorPriceHistoryModal'
+import { DiscountEditorModal } from './DiscountEditorModal'
 import { SLUG_HOMEPAGES } from '@/lib/competitor-homepages'
+
+interface DiscountSetting {
+  slug: string
+  label: string
+  discountPct: number
+}
 
 interface BasketItem {
   id: string
@@ -78,16 +85,24 @@ function Delta({ current, previous }: { current: number | null; previous: number
   )
 }
 
+function applyDiscount(price: number | null, pct: number): number | null {
+  if (price == null || pct === 0) return price
+  return price * (1 - pct / 100)
+}
+
 function PriceCell({
   entry,
   cutMyPrice,
   isCutMy,
+  discountPct = 0,
 }: {
   entry?: PriceEntry
   cutMyPrice: number | null
   isCutMy?: boolean
+  discountPct?: number
 }) {
-  const price = isCutMy ? cutMyPrice : (entry?.pricePerM2 ?? null)
+  const rawPrice = isCutMy ? cutMyPrice : (entry?.pricePerM2 ?? null)
+  const price = applyDiscount(rawPrice, discountPct)
   const previous = entry?.previousPricePerM2 ?? null
   const hasComparison = price != null && cutMyPrice != null && !isCutMy
   const cheaper = hasComparison && price < cutMyPrice
@@ -232,6 +247,27 @@ export function CompetitorPricesView({ category }: Props) {
     staleTime: 10 * 60 * 1000,
   })
 
+  const { data: discountSettings = [] } = useQuery<DiscountSetting[]>({
+    queryKey: ['discount-settings'],
+    queryFn: () => fetch('/api/discount-settings').then(r => r.json()),
+    staleTime: 5 * 60 * 1000,
+  })
+  const discountMap = useMemo(
+    () => Object.fromEntries(discountSettings.map(s => [s.slug, Number(s.discountPct)])),
+    [discountSettings]
+  )
+
+  const [discountsOn, setDiscountsOn] = useState(() =>
+    typeof window !== 'undefined' && localStorage.getItem('discounts-on') === 'true'
+  )
+  const [showDiscountEditor, setShowDiscountEditor] = useState(false)
+
+  function toggleDiscounts() {
+    const next = !discountsOn
+    setDiscountsOn(next)
+    localStorage.setItem('discounts-on', String(next))
+  }
+
   const [editingItem, setEditingItem] = useState<BasketItem | null>(null)
   const [historyItem, setHistoryItem] = useState<BasketItem | null>(null)
   const [search, setSearch] = useState('')
@@ -280,8 +316,29 @@ export function CompetitorPricesView({ category }: Props) {
       <div className="sticky top-0 z-30 bg-[#F7F7F5] pt-4">
         <div className="flex items-center justify-between pb-3">
           <p className="text-[12px] text-gray-400">
-            £/m² inc VAT · 1000 × 1000mm · delta vs previous run
+            £/m² inc VAT · 1000 × 1000mm · delta vs previous week
+            {discountsOn && <span className="ml-1.5 text-[#009FE3] font-medium">· discounts applied</span>}
           </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleDiscounts}
+              className={[
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[12px] font-medium transition-colors',
+                discountsOn
+                  ? 'bg-[#009FE3] border-[#009FE3] text-white'
+                  : 'bg-white border-[#E5E5E3] text-gray-600 hover:bg-gray-50',
+              ].join(' ')}
+            >
+              % Discounts {discountsOn ? 'on' : 'off'}
+            </button>
+            <button
+              onClick={() => setShowDiscountEditor(true)}
+              className="p-1.5 rounded-lg border border-[#E5E5E3] text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors bg-white"
+              title="Edit discount percentages"
+            >
+              <Settings2 size={13} />
+            </button>
+          </div>
           <button
             onClick={() => refetch()}
             disabled={isFetching}
@@ -379,6 +436,9 @@ export function CompetitorPricesView({ category }: Props) {
             <tbody className="divide-y divide-gray-50">
               {visibleItems.map(item => {
                 const cutMyPrice = data.cutMyPrices[item.id] ?? null
+                const effectiveCutMyPrice = discountsOn
+                  ? applyDiscount(cutMyPrice, discountMap['cut-my'] ?? 0)
+                  : cutMyPrice
                 const competitorPrices = data.competitors
                   .map(c => c.prices.find(p => p.basketItemId === item.id)?.pricePerM2 ?? null)
                   .filter((p): p is number => p !== null)
@@ -412,13 +472,20 @@ export function CompetitorPricesView({ category }: Props) {
                         <div className="text-[10px] text-amber-500 mt-0.5">No Cut My variant mapped</div>
                       )}
                     </td>
-                    <PriceCell cutMyPrice={cutMyPrice} isCutMy />
+                    <PriceCell cutMyPrice={effectiveCutMyPrice} isCutMy discountPct={discountsOn ? (discountMap['cut-my'] ?? 0) : 0} />
                     <td className="px-4 py-3 text-right text-sm font-mono tabular-nums text-gray-500 bg-gray-50/40">
                       {fmt(avgPrice)}
                     </td>
                     {data.competitors.map(c => {
                       const entry = c.prices.find(x => x.basketItemId === item.id)
-                      return <PriceCell key={c.slug} entry={entry} cutMyPrice={cutMyPrice} />
+                      return (
+                        <PriceCell
+                          key={c.slug}
+                          entry={entry}
+                          cutMyPrice={effectiveCutMyPrice}
+                          discountPct={discountsOn ? (discountMap[c.slug] ?? 0) : 0}
+                        />
+                      )
                     })}
                   </tr>
                 )
@@ -447,6 +514,13 @@ export function CompetitorPricesView({ category }: Props) {
       )}
 
       {editingItem && <VariantPicker item={editingItem} onClose={() => setEditingItem(null)} />}
+      {showDiscountEditor && (
+        <DiscountEditorModal
+          settings={discountSettings}
+          category={category}
+          onClose={() => setShowDiscountEditor(false)}
+        />
+      )}
       {historyItem && (
         <CompetitorPriceHistoryModal
           item={historyItem}
