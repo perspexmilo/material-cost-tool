@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
 import { X } from 'lucide-react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
 
 interface DiscountSetting {
   slug: string
@@ -11,7 +11,6 @@ interface DiscountSetting {
 }
 
 interface Props {
-  settings: DiscountSetting[]
   category: 'plastic' | 'wood'
   onClose: () => void
 }
@@ -19,14 +18,29 @@ interface Props {
 const PLASTIC_SLUGS = ['cut-my', 'simply-plastics', 'plastic-people', 'cut-plastic-sheeting', 'sheet-plastics', 'plastic-sheet-shop', 'plastic-sheets']
 const WOOD_SLUGS    = ['cut-my', 'wood-sheets', 'cnc-creations', 'plastic-people-mdf', 'cut-plastic-sheeting-mdf', 'just-mdf', 'mdf-ply-mfc-direct']
 
-export function DiscountEditorModal({ settings, category, onClose }: Props) {
+export function DiscountEditorModal({ category, onClose }: Props) {
   const queryClient = useQueryClient()
-  const slugs = category === 'wood' ? WOOD_SLUGS : PLASTIC_SLUGS
-  const relevant = slugs.map(slug => settings.find(s => s.slug === slug)).filter(Boolean) as DiscountSetting[]
 
-  const [localValues, setLocalValues] = useState<Record<string, string>>(
-    Object.fromEntries(relevant.map(s => [s.slug, String(s.discountPct)]))
-  )
+  const { data: settings = [], isLoading } = useQuery<DiscountSetting[]>({
+    queryKey: ['discount-settings'],
+    queryFn: () => fetch('/api/discount-settings').then(r => r.json()),
+    staleTime: 0,
+  })
+
+  const slugs = category === 'wood' ? WOOD_SLUGS : PLASTIC_SLUGS
+  const relevant = slugs
+    .map(slug => settings.find(s => s.slug === slug))
+    .filter(Boolean) as DiscountSetting[]
+
+  const [localValues, setLocalValues] = useState<Record<string, string>>({})
+
+  // Sync local input values once settings load
+  useEffect(() => {
+    if (relevant.length > 0) {
+      setLocalValues(Object.fromEntries(relevant.map(s => [s.slug, String(s.discountPct)])))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings])
 
   const mutation = useMutation({
     mutationFn: ({ slug, discountPct }: { slug: string; discountPct: number }) =>
@@ -64,35 +78,41 @@ export function DiscountEditorModal({ settings, category, onClose }: Props) {
           </button>
         </div>
 
-        <div className="divide-y divide-gray-50">
-          {relevant.map((s, i) => (
-            <div key={s.slug}>
-              {i === 1 && (
-                <p className="px-5 pt-3 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                  Competitors
-                </p>
-              )}
-              <div className="flex items-center justify-between px-5 py-3 gap-4">
-                <span className={`text-sm ${s.slug === 'cut-my' ? 'font-semibold text-[#009FE3]' : 'text-gray-700'}`}>
-                  {s.label}
-                </span>
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.5"
-                    value={localValues[s.slug] ?? '0'}
-                    onChange={e => setLocalValues(v => ({ ...v, [s.slug]: e.target.value }))}
-                    onBlur={() => handleBlur(s.slug)}
-                    className="w-16 text-right text-sm px-2 py-1 rounded-lg border border-[#E5E5E3] focus:outline-none focus:ring-2 focus:ring-[#2DBDAA]/40 focus:border-[#2DBDAA] tabular-nums"
-                  />
-                  <span className="text-sm text-gray-400">%</span>
+        {isLoading && (
+          <p className="text-sm text-gray-400 text-center py-8">Loading…</p>
+        )}
+
+        {!isLoading && (
+          <div className="divide-y divide-gray-50">
+            {relevant.map((s, i) => (
+              <div key={s.slug}>
+                {i === 1 && (
+                  <p className="px-5 pt-3 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                    Competitors
+                  </p>
+                )}
+                <div className="flex items-center justify-between px-5 py-3 gap-4">
+                  <span className={`text-sm ${s.slug === 'cut-my' ? 'font-semibold text-[#009FE3]' : 'text-gray-700'}`}>
+                    {s.label}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      value={localValues[s.slug] ?? '0'}
+                      onChange={e => setLocalValues(v => ({ ...v, [s.slug]: e.target.value }))}
+                      onBlur={() => handleBlur(s.slug)}
+                      className="w-16 text-right text-sm px-2 py-1 rounded-lg border border-[#E5E5E3] focus:outline-none focus:ring-2 focus:ring-[#2DBDAA]/40 focus:border-[#2DBDAA] tabular-nums"
+                    />
+                    <span className="text-sm text-gray-400">%</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         <div className="px-5 py-3 bg-gray-50 border-t border-[#E5E5E3] text-xs text-gray-400">
           Changes save automatically on blur

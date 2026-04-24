@@ -516,7 +516,6 @@ export function CompetitorPricesView({ category }: Props) {
       {editingItem && <VariantPicker item={editingItem} onClose={() => setEditingItem(null)} />}
       {showDiscountEditor && (
         <DiscountEditorModal
-          settings={discountSettings}
           category={category}
           onClose={() => setShowDiscountEditor(false)}
         />
