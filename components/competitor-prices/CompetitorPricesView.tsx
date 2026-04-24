@@ -8,12 +8,6 @@ import { CompetitorPriceHistoryModal } from './CompetitorPriceHistoryModal'
 import { DiscountEditorModal } from './DiscountEditorModal'
 import { SLUG_HOMEPAGES } from '@/lib/competitor-homepages'
 
-interface DiscountSetting {
-  slug: string
-  label: string
-  discountPct: number
-}
-
 interface BasketItem {
   id: string
   name: string
@@ -247,16 +241,10 @@ export function CompetitorPricesView({ category }: Props) {
     staleTime: 10 * 60 * 1000,
   })
 
-  const { data: discountSettings = [] } = useQuery<DiscountSetting[]>({
-    queryKey: ['discount-settings'],
-    queryFn: () => fetch('/api/discount-settings').then(r => r.json()),
-    staleTime: 0,
+  const [discountMap, setDiscountMap] = useState<Record<string, number>>(() => {
+    if (typeof window === 'undefined') return {}
+    try { return JSON.parse(localStorage.getItem('discount-map') ?? '{}') } catch { return {} }
   })
-  const discountMap = useMemo(
-    () => Object.fromEntries(discountSettings.map(s => [s.slug, Number(s.discountPct)])),
-    [discountSettings]
-  )
-
   const [discountsOn, setDiscountsOn] = useState(() =>
     typeof window !== 'undefined' && localStorage.getItem('discounts-on') === 'true'
   )
@@ -266,6 +254,11 @@ export function CompetitorPricesView({ category }: Props) {
     const next = !discountsOn
     setDiscountsOn(next)
     localStorage.setItem('discounts-on', String(next))
+  }
+
+  function handleSaveDiscounts(map: Record<string, number>) {
+    setDiscountMap(map)
+    localStorage.setItem('discount-map', JSON.stringify(map))
   }
 
   const [editingItem, setEditingItem] = useState<BasketItem | null>(null)
@@ -518,6 +511,8 @@ export function CompetitorPricesView({ category }: Props) {
       {showDiscountEditor && (
         <DiscountEditorModal
           category={category}
+          discountMap={discountMap}
+          onSave={handleSaveDiscounts}
           onClose={() => setShowDiscountEditor(false)}
         />
       )}
