@@ -2,8 +2,7 @@
 
 import { useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { X, ExternalLink } from 'lucide-react'
-import { SLUG_HOMEPAGES } from '@/lib/competitor-homepages'
+import { X } from 'lucide-react'
 import { format } from 'date-fns'
 import {
   ResponsiveContainer,
@@ -139,31 +138,6 @@ export function CompetitorPriceHistoryModal({ item, category, cutMyPrice, onClos
                     {item.widthMm} × {item.heightMm}mm
                   </span>
                 </p>
-                {competitors.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2.5">
-                    {competitors.map(c => {
-                      const url = SLUG_HOMEPAGES[c.slug]
-                      if (!url) return null
-                      return (
-                        <a
-                          key={c.slug}
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={e => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-opacity hover:opacity-80"
-                          style={{
-                            backgroundColor: `${slugColor(c.slug)}18`,
-                            color: slugColor(c.slug),
-                          }}
-                        >
-                          {c.label}
-                          <ExternalLink size={9} />
-                        </a>
-                      )
-                    })}
-                  </div>
-                )}
               </div>
             </div>
             <button
