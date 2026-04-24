@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { X } from 'lucide-react'
+import { X, ExternalLink } from 'lucide-react'
 import { format } from 'date-fns'
 import {
   ResponsiveContainer,
@@ -52,6 +52,21 @@ const SLUG_COLORS: Record<string, string> = {
   'cut-plastic-sheeting-mdf': '#EF4444',
   'just-mdf':               '#10B981',
   'mdf-ply-mfc-direct':     '#F97316',
+}
+
+const SLUG_HOMEPAGES: Record<string, string> = {
+  'simply-plastics':          'https://www.simplyplastics.com',
+  'plastic-people':           'https://www.theplasticpeople.co.uk',
+  'cut-plastic-sheeting':     'https://www.cutplasticsheeting.co.uk',
+  'sheet-plastics':           'https://www.sheetplastics.co.uk',
+  'plastic-sheet-shop':       'https://www.plasticsheetsshop.co.uk',
+  'plastic-sheets':           'https://www.plasticsheets.com',
+  'wood-sheets':              'https://www.woodsheets.com',
+  'cnc-creations':            'https://www.cnccreations.co.uk',
+  'plastic-people-mdf':       'https://www.theplasticpeople.co.uk',
+  'cut-plastic-sheeting-mdf': 'https://www.cutplasticsheeting.co.uk',
+  'just-mdf':                 'https://www.justmdf.co.uk',
+  'mdf-ply-mfc-direct':       'https://www.mdfdirect.co.uk',
 }
 
 const CUTMY_COLOR = '#009FE3'
@@ -123,27 +138,54 @@ export function CompetitorPriceHistoryModal({ item, category, cutMyPrice, onClos
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5E5E3]">
-          <div className="flex items-center gap-2">
-            <div className="w-[3px] h-4 rounded-full" style={{ backgroundColor: CUTMY_COLOR }} />
-            <div>
-              <p className="text-[12px] font-semibold text-gray-500 uppercase tracking-widest">
-                Competitor Price History
-              </p>
-              <p className="text-sm font-semibold text-gray-900 mt-0.5">
-                {item.name}{' '}
-                <span className="text-gray-400 font-normal text-xs">
-                  {item.widthMm} × {item.heightMm}mm
-                </span>
-              </p>
+        <div className="px-6 py-4 border-b border-[#E5E5E3]">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-2">
+              <div className="w-[3px] h-4 rounded-full mt-0.5 shrink-0" style={{ backgroundColor: CUTMY_COLOR }} />
+              <div>
+                <p className="text-[12px] font-semibold text-gray-500 uppercase tracking-widest">
+                  Competitor Price History
+                </p>
+                <p className="text-sm font-semibold text-gray-900 mt-0.5">
+                  {item.name}{' '}
+                  <span className="text-gray-400 font-normal text-xs">
+                    {item.widthMm} × {item.heightMm}mm
+                  </span>
+                </p>
+                {competitors.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2.5">
+                    {competitors.map(c => {
+                      const url = SLUG_HOMEPAGES[c.slug]
+                      if (!url) return null
+                      return (
+                        <a
+                          key={c.slug}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-opacity hover:opacity-80"
+                          style={{
+                            backgroundColor: `${slugColor(c.slug)}18`,
+                            color: slugColor(c.slug),
+                          }}
+                        >
+                          {c.label}
+                          <ExternalLink size={9} />
+                        </a>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+            >
+              <X size={18} />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X size={18} />
-          </button>
         </div>
 
         {/* Body */}
