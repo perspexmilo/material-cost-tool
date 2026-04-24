@@ -240,7 +240,7 @@ export function CompetitorPriceHistoryModal({ item, category, cutMyPrice, onClos
                     strokeWidth={2}
                     dot={{ r: 3, strokeWidth: 0, fill: slugColor(c.slug) }}
                     activeDot={{ r: 4, strokeWidth: 0 }}
-                    connectNulls={false}
+                    connectNulls={true}
                   />
                 ))}
                 {cutMyPrice != null && (
