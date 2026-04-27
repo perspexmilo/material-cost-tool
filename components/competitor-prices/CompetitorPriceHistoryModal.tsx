@@ -221,24 +221,33 @@ export function CompetitorPriceHistoryModal({ item, category, cutMyPrice, onClos
                     if (!active || !payload?.length) return null
                     const validPayload = payload.filter(p => p.value != null)
                     if (!validPayload.length) return null
+                    const idx = chartData.findIndex(d => d.date === label)
+                    const prev = idx > 0 ? chartData[idx - 1] : null
                     return (
                       <div className="bg-white border border-[#E5E5E3] rounded-lg px-3 py-2 shadow-sm text-[12px]">
                         <p className="text-gray-400 mb-1.5">{format(new Date(label as number), 'dd MMM yyyy')}</p>
-                        {validPayload.map(p => (
-                          <div key={p.dataKey as string} className="flex items-center gap-2 mb-0.5">
-                            <span
-                              className="w-2 h-2 rounded-full shrink-0"
-                              style={{ backgroundColor: p.color }}
-                            />
-                            <span className="text-gray-600">{p.name}</span>
-                            <span className="font-semibold text-gray-900 ml-auto pl-4">
-                              {new Intl.NumberFormat('en-GB', {
-                                style: 'currency',
-                                currency: 'GBP',
-                              }).format(p.value as number)}/m²
-                            </span>
-                          </div>
-                        ))}
+                        {validPayload.map(p => {
+                          const key = p.dataKey as string
+                          const cur = p.value as number
+                          const prevVal = prev?.[key] as number | null | undefined
+                          const diff = (prevVal != null && prevVal > 0) ? cur - prevVal : null
+                          const pct = diff != null && prevVal ? (diff / prevVal) * 100 : null
+                          const up = diff != null && diff > 0
+                          return (
+                            <div key={key} className="flex items-center gap-2 mb-0.5">
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                              <span className="text-gray-600">{p.name}</span>
+                              <span className="font-semibold text-gray-900 ml-auto pl-4">
+                                {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(cur)}/m²
+                              </span>
+                              {diff != null && Math.abs(diff) >= 0.01 && (
+                                <span className={`text-[10px] font-medium ${up ? 'text-green-600' : 'text-red-500'}`}>
+                                  {up ? '▲' : '▼'}{Math.abs(diff).toFixed(2)} ({Math.abs(pct!).toFixed(1)}%)
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
                     )
                   }}
