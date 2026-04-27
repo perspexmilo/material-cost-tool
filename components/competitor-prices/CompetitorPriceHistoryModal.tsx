@@ -307,23 +307,23 @@ export function CompetitorPriceHistoryModal({ item, category, cutMyPrice, onClos
       {/* Screenshot lightbox */}
       {lightboxUrl && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4"
+          className="fixed inset-0 z-[60] flex items-start justify-center bg-black/75 p-6"
           onClick={() => setLightboxUrl(null)}
         >
           <div
-            className="relative max-w-5xl w-full max-h-[90vh] bg-white rounded-xl overflow-hidden shadow-2xl"
+            className="relative w-full max-w-4xl max-h-[92vh] bg-white rounded-xl shadow-2xl overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             <button
               onClick={() => setLightboxUrl(null)}
-              className="absolute top-2 right-2 z-10 bg-white/80 hover:bg-white rounded-full p-1 shadow text-gray-600 hover:text-gray-900 transition-colors"
+              className="sticky top-2 float-right mr-2 z-10 bg-white/90 hover:bg-white rounded-full p-1.5 shadow text-gray-600 hover:text-gray-900 transition-colors"
             >
               <X size={16} />
             </button>
             <img
               src={lightboxUrl}
               alt="Competitor page screenshot"
-              className="w-full h-full object-contain max-h-[90vh]"
+              className="w-full h-auto block"
             />
           </div>
         </div>
