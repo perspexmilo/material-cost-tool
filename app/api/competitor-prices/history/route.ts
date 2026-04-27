@@ -55,12 +55,14 @@ export async function GET(req: NextRequest) {
     competitor: string
     run_date: Date
     price_per_m2: string
+    screenshot_url: string | null
   }>>`
     WITH ranked AS (
       SELECT
         cr.competitor,
         DATE_TRUNC('day', cr.run_at) AS run_date,
         cp.price_per_m2,
+        cp.screenshot_url,
         ROW_NUMBER() OVER (
           PARTITION BY cr.competitor, DATE_TRUNC('day', cr.run_at)
           ORDER BY cr.run_at DESC
@@ -72,7 +74,7 @@ export async function GET(req: NextRequest) {
         AND cr.status IN ('success', 'partial')
         AND cp.price_per_m2 IS NOT NULL
     )
-    SELECT competitor, run_date, price_per_m2
+    SELECT competitor, run_date, price_per_m2, screenshot_url
     FROM ranked
     WHERE rn = 1
     ORDER BY competitor, run_date ASC
@@ -108,7 +110,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Group by competitor slug, merging mdf/ply/mfc-direct into one for wood
-  const grouped = new Map<string, { label: string; points: { date: number; pricePerM2: number }[] }>()
+  const grouped = new Map<string, { label: string; points: { date: number; pricePerM2: number; screenshotUrl: string | null }[] }>()
 
   for (const row of rows) {
     const slug =
@@ -126,6 +128,7 @@ export async function GET(req: NextRequest) {
     grouped.get(slug)!.points.push({
       date: new Date(row.run_date).getTime(),
       pricePerM2: Number(row.price_per_m2),
+      screenshotUrl: row.screenshot_url ?? null,
     })
   }
 

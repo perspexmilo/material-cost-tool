@@ -13,6 +13,7 @@ import {
   Tooltip,
   CartesianGrid,
   Legend,
+  ReferenceLine,
 } from 'recharts'
 
 interface BasketItem {
@@ -25,6 +26,7 @@ interface BasketItem {
 interface HistoryPoint {
   date: number
   pricePerM2: number
+  screenshotUrl: string | null
 }
 
 interface CompetitorHistory {
@@ -88,6 +90,7 @@ interface Props {
 
 export function CompetitorPriceHistoryModal({ item, category, cutMyPrice, onClose }: Props) {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  const [selectedDate, setSelectedDate] = useState<number | null>(null)
 
   const { data, isLoading, isError } = useQuery<ApiResponse>({
     queryKey: ['competitor-price-history', item.id],
@@ -177,7 +180,16 @@ export function CompetitorPriceHistoryModal({ item, category, cutMyPrice, onClos
 
           {competitors.length > 0 && (
             <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={chartData} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
+              <LineChart
+                data={chartData}
+                margin={{ top: 4, right: 16, bottom: 0, left: 0 }}
+                onClick={(state) => {
+                  const date = state?.activeLabel as number | undefined
+                  if (!date) return
+                  setSelectedDate(prev => prev === date ? null : date)
+                }}
+                style={{ cursor: 'pointer' }}
+              >
                 <CartesianGrid vertical={false} stroke="#F0F0EE" />
                 <XAxis
                   dataKey="date"
@@ -261,6 +273,14 @@ export function CompetitorPriceHistoryModal({ item, category, cutMyPrice, onClos
                     activeDot={{ r: 4, strokeWidth: 0, fill: CUTMY_COLOR }}
                   />
                 )}
+                {selectedDate != null && (
+                  <ReferenceLine
+                    x={selectedDate}
+                    stroke="#6B7280"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 2"
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           )}
@@ -270,37 +290,66 @@ export function CompetitorPriceHistoryModal({ item, category, cutMyPrice, onClos
           </p>
 
           {/* Screenshot thumbnails */}
-          {competitors.some(c => c.screenshot) && (
-            <div className="mt-4 border-t border-[#E5E5E3] pt-4">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
-                Latest screenshots
-              </p>
-              <div className="flex gap-3 overflow-x-auto pb-1">
-                {competitors.filter(c => c.screenshot).map(c => (
-                  <button
-                    key={c.slug}
-                    onClick={() => setLightboxUrl(c.screenshot!.url)}
-                    className="shrink-0 group relative rounded-lg overflow-hidden border border-[#E5E5E3] hover:border-gray-400 transition-colors"
-                    style={{ width: 140 }}
-                  >
-                    <img
-                      src={c.screenshot!.url}
-                      alt={c.label}
-                      className="w-full h-20 object-cover object-top"
-                    />
-                    <div className="px-2 py-1.5 bg-white border-t border-[#E5E5E3]">
-                      <p className="text-[10px] font-semibold text-gray-700 truncate" style={{ color: slugColor(c.slug) }}>
-                        {c.label}
-                      </p>
-                      <p className="text-[9px] text-gray-400">
-                        {format(new Date(c.screenshot!.runAt), 'd MMM yyyy')}
-                      </p>
-                    </div>
-                  </button>
-                ))}
+          {competitors.some(c => c.screenshot || c.points.some(p => p.screenshotUrl)) && (() => {
+            const thumbs = competitors.map(c => {
+              if (selectedDate != null) {
+                const point = c.points.find(p => p.date === selectedDate)
+                return point?.screenshotUrl ? { slug: c.slug, label: c.label, url: point.screenshotUrl, date: selectedDate } : null
+              }
+              return c.screenshot ? { slug: c.slug, label: c.label, url: c.screenshot.url, date: new Date(c.screenshot.runAt).getTime() } : null
+            }).filter((t): t is NonNullable<typeof t> => t !== null)
+
+            if (thumbs.length === 0 && selectedDate != null) {
+              return (
+                <div className="mt-4 border-t border-[#E5E5E3] pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                      Screenshots · {format(new Date(selectedDate), 'd MMM yyyy')}
+                    </p>
+                    <button onClick={() => setSelectedDate(null)} className="text-[10px] text-gray-400 hover:text-gray-600">
+                      Show latest
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-400">No screenshots captured on this date.</p>
+                </div>
+              )
+            }
+
+            return (
+              <div className="mt-4 border-t border-[#E5E5E3] pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                    {selectedDate != null
+                      ? `Screenshots · ${format(new Date(selectedDate), 'd MMM yyyy')}`
+                      : 'Latest screenshots'}
+                  </p>
+                  {selectedDate != null && (
+                    <button onClick={() => setSelectedDate(null)} className="text-[10px] text-gray-400 hover:text-gray-600 transition-colors">
+                      Show latest
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-1">
+                  {thumbs.map(t => (
+                    <button
+                      key={t.slug}
+                      onClick={() => setLightboxUrl(t.url)}
+                      className="shrink-0 rounded-lg overflow-hidden border border-[#E5E5E3] hover:border-gray-400 transition-colors"
+                      style={{ width: 140 }}
+                    >
+                      <img src={t.url} alt={t.label} className="w-full h-20 object-cover object-top" />
+                      <div className="px-2 py-1.5 bg-white border-t border-[#E5E5E3]">
+                        <p className="text-[10px] font-semibold truncate" style={{ color: slugColor(t.slug) }}>
+                          {t.label}
+                        </p>
+                        <p className="text-[9px] text-gray-400">{format(new Date(t.date), 'd MMM yyyy')}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
         </div>
       </div>
 
